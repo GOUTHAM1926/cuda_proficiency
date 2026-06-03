@@ -1,6 +1,6 @@
-# GPU Hardware Clarity — All My Doubts Answered
+# GPU Hardware Clarity — Common Doubts Answered
 
-> **My GPU: NVIDIA GeForce RTX 3060**
+> **Target GPU: NVIDIA GeForce RTX 3060**
 >
 > - Architecture: Ampere (Compute Capability 8.6)
 > - VRAM: 12 GB GDDR6
@@ -16,7 +16,7 @@
 > - Warp Schedulers per SM: 4
 > - Max Grid Size (x): 2^31 - 1 = 2,147,483,647 blocks
 
-These specs were obtained by running `device_query.cu` which uses `cudaGetDeviceProperties()`.
+These specifications were obtained by running [`device_query.cu`](device_query.cu) which uses `cudaGetDeviceProperties()`.
 
 ---
 
@@ -25,7 +25,7 @@ These specs were obtained by running `device_query.cu` which uses `cudaGetDevice
 These are all the SAME thing — the big main memory on the GPU card.
 
 ```
-Global Memory (VRAM):  12 GB on my RTX 3060
+Global Memory (VRAM):  12 GB on the RTX 3060
 ```
 
 This is the GDDR6 memory chips physically soldered onto the GPU card. NVIDIA calls it "global memory" in CUDA. Hardware people call it VRAM or DRAM. Accessible by ALL threads in ALL blocks across ALL SMs. Large but slow.
@@ -35,7 +35,7 @@ This is the GDDR6 memory chips physically soldered onto the GPU card. NVIDIA cal
 ## What Is L2 Cache? Why Does It Exist?
 
 ```
-L2 Cache: 2.25 MB on my RTX 3060
+L2 Cache: 2.25 MB on the RTX 3060
 ```
 
 L2 cache sits BETWEEN the SMs and VRAM. It's shared by ALL 28 SMs.
@@ -187,7 +187,7 @@ If your kernel uses lots of shared memory, L1 gets smaller. If your kernel uses 
 - **Thread** = smallest unit. One thread executes one copy of your function.
 - **Block** = group of threads (up to 1024). All threads in a block run on the SAME SM and can cooperate via shared memory and `__syncthreads()`.
 - **Grid** = ALL blocks launched for one kernel. 1 kernel = 1 grid. Can have up to 2^31-1 blocks.
-- **SM** = Streaming Multiprocessor. Hardware processing unit. My GPU has 28 SMs.
+- **SM** = Streaming Multiprocessor. Hardware processing unit. The RTX 3060 GPU has 28 SMs.
 
 ### Can an SM run more than one block?
 
@@ -264,6 +264,8 @@ Example cases:
 
 ### Grid size (2^31-1) vs SM occupancy (16) — NOT contradictory
 
+It is often noted that we can initialize 2^31-1 blocks, yet max blocks per SM is only 16. Both are correct but mean different things:
+
 - **2^31-1** = how many blocks you can launch in ONE kernel (grid limit)
 - **16** = how many blocks ONE SM can hold at any moment (occupancy limit)
 
@@ -306,7 +308,7 @@ Two options:
 
 **Option A: Launch a second kernel.** When a kernel finishes, ALL blocks are guaranteed complete. So launch kernel 1, let it finish, then launch kernel 2 that reads kernel 1's results. The kernel boundary is the synchronization point.
 
-**Option B: Use atomic operations.** An atomic operation is a special hardware instruction that lets multiple threads safely write to the SAME global memory location without corrupting the data. For example, `atomicAdd(&total, my_value)` means "add my value to the total, and the hardware guarantees that no two threads corrupt each other even if they do it at the same time."
+**Option B: Use atomic operations.** An atomic operation is a special hardware instruction that lets multiple threads safely write to the SAME global memory location without corrupting the data. For example, `atomicAdd(&total, value)` means "add a value to the total, and the hardware guarantees that no two threads corrupt each other even if they do it at the same time."
 
 ```
 Example — each block adds its partial sum to a global total:
@@ -323,9 +325,7 @@ Atomic operations are simpler (one kernel instead of two), but can be slow if th
 
 ## 48 Warps But Only 4 Warp Schedulers — What Does "Concurrent" Mean?
 
-My RTX 3060 has 48 max warps per SM and 4 warp schedulers per SM.
-
-**48 warps = "resident" on the SM.** All 48 have their threads loaded, registers allocated, state stored. They're all sitting in the SM, ready to go.
+The RTX 3060 has 48 max warps per SM and 4 warp schedulers per SM. This means 48 × 32 = 1536 threads concurrently per SM. But if only 4 warps execute per cycle, what does "concurrently" actually mean?
 
 **4 warp schedulers = at any SINGLE clock cycle, only 4 warps execute instructions.** One warp per scheduler.
 
@@ -369,6 +369,8 @@ If you launch MORE than 43,008 threads worth of blocks, the extra blocks wait in
 ---
 
 ## Tensor Cores vs CUDA Cores for Matmul
+
+A common question arises: if we have 128 CUDA cores but only 4 tensor cores per SM, aren't 4 tensor cores too little for huge matrix multiplications?
 
 **A tensor core is NOT like a CUDA core.** Don't think of "4 tensor cores" as "4 tiny things."
 
@@ -419,7 +421,7 @@ Hardware does: Register ← L1 ← L2 ← VRAM (caches along the way)
 
 ---
 
-## Full RTX 3060 Specs Table
+## Full RTX 3060 Specifications Table
 
 | Property | Value | Meaning |
 |---|---|---|
@@ -443,13 +445,13 @@ Hardware does: Register ← L1 ← L2 ← VRAM (caches along the way)
 
 ---
 
-## How to Find These Specs on Your Own System
+## How to Find These Specifications on Your Own System
 
-I asked: what are the commands to find L2 cache, L1 cache, shared memory sizes on my GPU?
+A common question is: what are the commands to find L2 cache, L1 cache, shared memory sizes on a GPU?
 
 **For VRAM:** `nvidia-smi` is enough — it shows total GPU memory.
 
-**For L2 cache, shared memory, thread limits, and everything else:** There's no simple `nvidia-smi` command. You need to write a CUDA program using `cudaGetDeviceProperties()`. That's what `device_query.cu` in the cuda_proficiency root does. The key fields are:
+**For L2 cache, shared memory, thread limits, and everything else:** There's no simple `nvidia-smi` command. You need to write a CUDA program using `cudaGetDeviceProperties()`. That's what [`device_query.cu`](device_query.cu) in the cuda_proficiency root does. The key fields are:
 
 ```c
 cudaDeviceProp prop;

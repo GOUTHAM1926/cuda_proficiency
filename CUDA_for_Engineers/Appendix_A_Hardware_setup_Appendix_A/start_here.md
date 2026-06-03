@@ -42,7 +42,7 @@ From the command line [which can be accessed under Ubuntu via the keyboard short
 
 ---> to produce a list of peripheral  devices installed on your system ("ls" is short for "list" and "pci" is the "communications-bus" that connects between the CPU and peripheral devices such as your graphics card(GPU) and  "-i" flag is given to "grep" to ignore the case-sensitivity of the search term "nvidia" , and "grep" is a command that searches for a specific pattern in a file or stream of text and the full list of installed PCI devices  is piped to "grep" ---> the pattern-matching tool,to search the list for nvidia in a case-sensitive manner,as indicated by " -i " ) 
 
--on my system it produced the following output : 
+-on a typical system it produced the following output : 
 
 " 01:00.0 VGA compatible controller: NVIDIA Corporation GA106 [GeForce RTX 3060 Lite Hash Rate] (rev a1) " ---> indicating the presence of a GeForce RTX 3060  graphics card  ,
 and if your system has no installed NVIDIA card,proceed to the topic "Upgrading-Compute-Capability" below or else if you do have installed NVIDIA card ,note the model and proceed to the section -
@@ -64,14 +64,14 @@ Command : " nvidia-smi --query-gpu=compute_cap --format=csv  "
 --->If you have the CUDA Toolkit installed , NVIDIA provides a utility specially for detailed hardware information ,
 --->Location : Usually found at " /usr/local/cuda/extras/demo_suite/deviceQuery " 
 try this command : " /usr/local/cuda/extras/demo_suite/deviceQuery | grep "Capability" "if its cuda-12.8 --->mention cuda-12.8 instead of just "cuda" and if its cuda-13.0 that u r having,mention cuda-13.0 insead of just "cuda" in above command ,and so on ...,
---->this directly shows the  "CUDA Capability Major/Minor version number " (ex: my terinal showed as "8.6" in which 8 is the major version number and 6 is the minor version number ,and both of these version numbers tells us the Architecture Generation and incremental improvements respectively (search in nvidia documentaions for more info )) ,
+--->this directly shows the  "CUDA Capability Major/Minor version number " (ex: the terminal might show "8.6" in which 8 is the major version number and 6 is the minor version number, and both of these version numbers tells us the Architecture Generation and incremental improvements respectively (search in nvidia documentaions for more info )) ,
 
 3. Using "nvcc" (To check supported architectures) : 
 ---> To see which compute capabilities your installed compiler can target for building software : 
 use this command : " nvcc --help | grep -A 20 "gpu-architecture" " 
 and if you want to  make sure your terminal always points to the correct and newest CUDA version without typing long paths , run this command to see where your system thinks nvcc is living : 
 command : "which nvcc"
-(ex : my terminal gave this : " /usr/local/cuda-13.0/bin/nvcc " --->indicating my system is using cuda-13.0) and 
+(ex : a terminal might output : " /usr/local/cuda-13.0/bin/nvcc " --->indicating the system is using cuda-13.0) and 
 
 ### Quick Reference : Compute Capabilities of NVIDIA GPU's : 
 
@@ -92,13 +92,13 @@ command : "which nvcc"
 if the OS is other than linux then : visit "https://developer.nvidia.com/cuda-gpus"  and then go to the appropriate column  to find the compute capability of your GPU ;  
 
 ### Hardware Nomenclature : 
---->Names like Geforce RTX 3060 actually designate a graphics card ,   not gpu itself ,in my case the graphics card includes a model GA106 gpu that has "Ampere class architecture " and compute-capability 8.6 , but when discussing CUDA  hardware , there are 4-major designations : 
-1.Model name (ex : Geforce RTX 3060 in my case) ; 
-2.Model number (ex : GA106 chip in my case) ; 
-3.Compute capability (ex : 8.6 in my case) ;  
-4.Architecture class (ex : Ampere class architecture in my case) .  
+--->Names like Geforce RTX 3060 actually designate a graphics card ,   not gpu itself , in this case the graphics card includes a model GA106 gpu that has "Ampere class architecture " and compute-capability 8.6 , but when discussing CUDA  hardware , there are 4-major designations : 
+1.Model name (ex : Geforce RTX 3060) ; 
+2.Model number (ex : GA106 chip) ; 
+3.Compute capability (ex : 8.6) ;  
+4.Architecture class (ex : Ampere class architecture) .  
 
-now you may ask a doubt like whats this model number?Is that chip is what we mean by actual gpu or what?Can i say i have a GA106 chip or GA106GPU?or else both are different or same?or else all thjose 4 components/designations mentioned above are combinedly a GPU?or else Geforce RTX 3060(in my case) is a what the real GPU?if no t,whats this GeForce RTX 3060 called?
+now you may ask a doubt like whats this model number?Is that chip is what we mean by actual gpu or what?Can i say i have a GA106 chip or GA106GPU?or else both are different or same?or else all thjose 4 components/designations mentioned above are combinedly a GPU?or else Geforce RTX 3060 is a what the real GPU?if no t,whats this GeForce RTX 3060 called?
 ---> see for all the questions asked above, we shouldnt get confused and mix things up ,for clear clarity we should move ourselves from "Consumer language"(what gamers say/call) to "Engineer Language"(what CUDA developers say) :
 # 1.The GeForce RTX 3060 is the Graphics card : 
 In professional circles , this is the Card or the Board (or sometimes just "the GPU" in casual conversation) , 
@@ -108,7 +108,7 @@ In professional circles , this is the Card or the Board (or sometimes just "the 
 
 # 2.The GA106 is the GPU (The chip/gpu chip) : 
 when the author says "GPU" ,he is specifically talking about the silicon chip soldered onto the center of that board ,
----> what it is : This is the "brain ", and its the actual square piece of silicon where the math happens and with this chip in my system, now I can absolutely say,"I have a GA106 GPU ",thats 100% technically correct, but its better to say "I have GA106 chip" or "I have GA106 GPU chip" to avoid confusion , 
+---> what it is : This is the "brain ", and its the actual square piece of silicon where the math happens and with this chip in a system, one can absolutely say,"I have a GA106 GPU ",thats 100% technically correct, but its better to say "I have GA106 chip" or "I have GA106 GPU chip" to avoid confusion , 
 ---> So, when someone says "I have a GA106 GPU", he/she is referring to the actual silicon chip (the brain) , not the entire graphics card (the whole package) , 
 ---> Analogy : Think of it like a "CPU" (the chip inside) vs a "Computer" (the whole box with fans, lights, and ports/Graphics card) or else this is an engine (the chip inside) vs a car (the whole body with wheels,seats,lights,and ports/Graphics card) . 
 
@@ -188,12 +188,12 @@ When we move from Ampere (8.6) to Ada (8.9), the actual "DNA" changes :
 
 2. Why does the RTX 3090 have CC 8.6 while an A100 has CC 8.0 ? 
 It sounds backwards, right? Usually, a higher number is better,but in the world of NVIDIA, these numbers often represent specialization , 
----> Compute capability 8.0(ex : NVIDIA A100) is used for Data center/AI/supercomputing applications with huge(164 KB) shared memory per SM , and with large L1 cache size,optimized for FP64(double-precision) math speed , whereas Compute-capability 8.6(ex : my  NVIDIA RTX 3060/3090) is specially targeted audience of gamers/creators/local workstations with smaller(100 KB) shared memory per SM and smaller L1-Cache size and optimized for FP32(single-precision) math speed , 
+---> Compute capability 8.0(ex : NVIDIA A100) is used for Data center/AI/supercomputing applications with huge(164 KB) shared memory per SM , and with large L1 cache size,optimized for FP64(double-precision) math speed , whereas Compute-capability 8.6(ex : an NVIDIA RTX 3060/3090) is specially targeted audience of gamers/creators/local workstations with smaller(100 KB) shared memory per SM and smaller L1-Cache size and optimized for FP32(single-precision) math speed , 
 
 The Difference : 
 
     CC 8.0 (The Scientist) : The A100 GPU  is built for massive scientific simulations (like weather or physics) and it needs a massive "desk" (Shared Memory) to hold data while it works ,whereas 
-    CC 8.6 (The Gamer/Worker) : my  RTX 3060 is built for speed , and it has a slightly "newer" instruction set (hence .6) that allows it to process twice as many FP32 operations per clock cycle compared to the older 8.0 design, but it has a smaller "desk" (Shared Memory) ,
+    CC 8.6 (The Gamer/Worker) : the RTX 3060 is built for speed , and it has a slightly "newer" instruction set (hence .6) that allows it to process twice as many FP32 operations per clock cycle compared to the older 8.0 design, but it has a smaller "desk" (Shared Memory) ,
 
 3. What changes when CC changes (but Architecture stays the same) ? 
 When the CC version moves from 8.0 to 8.6, the "Core Blueprint" stays the same, but three main things can change:
@@ -352,9 +352,9 @@ High-performance GPUs like the GTX 980 draw far more power than the motherboard 
 ---
 ---
 
-# GPU Hardware Deep Dive — All My Doubts Answered
+# GPU Hardware Deep Dive — Common Doubts Answered
 
-> **My GPU: NVIDIA GeForce RTX 3060**
+> **Target GPU: NVIDIA GeForce RTX 3060**
 > - Architecture: Ampere (Compute Capability 8.6)
 > - VRAM: 12 GB GDDR6
 > - SMs: 28
@@ -369,7 +369,7 @@ High-performance GPUs like the GTX 980 draw far more power than the motherboard 
 > - Warp Schedulers per SM: 4
 > - Max Grid Size (x): 2^31 - 1 = 2,147,483,647 blocks
 
-These specs were obtained by running `device_query.cu` (in the cuda_proficiency root) which uses `cudaGetDeviceProperties()`.
+These specifications were obtained by running [`device_query.cu`](file:///home/blu-bridge016/cuda_proficiency/device_query.cu) (in the cuda_proficiency root) which uses `cudaGetDeviceProperties()`.
 
 ---
 
@@ -378,7 +378,7 @@ These specs were obtained by running `device_query.cu` (in the cuda_proficiency 
 These are all the SAME thing — the big main memory on the GPU card.
 
 ```
-Global Memory (VRAM):  12 GB on my RTX 3060
+Global Memory (VRAM):  12 GB on the RTX 3060
 ```
 
 This is the GDDR6 memory chips physically soldered onto the GPU card. NVIDIA calls it "global memory" in CUDA. Hardware people call it VRAM or DRAM. Accessible by ALL threads in ALL blocks across ALL SMs. Large but slow.
@@ -388,7 +388,7 @@ This is the GDDR6 memory chips physically soldered onto the GPU card. NVIDIA cal
 ## What Is L2 Cache? Why Does It Exist?
 
 ```
-L2 Cache: 2.25 MB on my RTX 3060
+L2 Cache: 2.25 MB on the RTX 3060
 ```
 
 L2 cache sits BETWEEN the SMs and VRAM. It's shared by ALL 28 SMs.
@@ -543,7 +543,7 @@ If your kernel uses lots of shared memory, L1 gets smaller. If your kernel uses 
 - **Thread** = smallest unit. One thread executes one copy of your function.
 - **Block** = group of threads (up to 1024). All threads in a block run on the SAME SM and can cooperate via shared memory and `__syncthreads()`.
 - **Grid** = ALL blocks launched for one kernel. 1 kernel = 1 grid. Can have up to 2^31-1 blocks.
-- **SM** = Streaming Multiprocessor. Hardware processing unit. My GPU has 28 SMs.
+- **SM** = Streaming Multiprocessor. Hardware processing unit. The RTX 3060 GPU has 28 SMs.
 
 ### Can an SM run more than one block?
 
@@ -600,7 +600,7 @@ Example cases:
 
 ### Grid size (2^31-1) vs SM occupancy (16) — NOT contradictory
 
-My colleague said we can initialize 2^31-1 blocks, and I learned max blocks per SM is only 16. Both are correct but mean different things:
+It is often noted that we can initialize 2^31-1 blocks, and learned max blocks per SM is only 16. Both are correct but mean different things:
 
 - **2^31-1** = how many blocks you can launch in ONE kernel (grid limit — the total number of blocks)
 - **16** = how many blocks ONE SM can hold at any moment (occupancy limit — how many fit simultaneously)
@@ -660,13 +660,13 @@ Block 0 (4 threads):
 
 ### What are atomic operations?
 
-An atomic operation is a special hardware instruction that lets multiple threads safely write to the SAME global memory location without corrupting the data. For example, `atomicAdd(&total, my_value)` means "add my value to the total, and guarantee that no two threads corrupt each other even if they do it at the same time."
+An atomic operation is a special hardware instruction that lets multiple threads safely write to the SAME global memory location without corrupting the data. For example, `atomicAdd(&total, value)` means "add a value to the total, and guarantee that no two threads corrupt each other even if they do it at the same time."
 
 ---
 
 ## 48 Warps But Only 4 Warp Schedulers — What Does "Concurrent" Mean?
 
-My RTX 3060 has 48 max warps per SM and 4 warp schedulers per SM. My colleague said 48 × 32 = 1536 threads concurrently per SM. But if only 4 warps execute per cycle, what does "concurrently" actually mean?
+The RTX 3060 has 48 max warps per SM and 4 warp schedulers per SM. This means 48 × 32 = 1536 threads concurrently per SM. But if only 4 warps execute per cycle, what does "concurrently" actually mean?
 
 **48 warps = "resident" on the SM.** All 48 have their threads loaded, registers allocated, state stored. They're all sitting in the SM, ready to go.
 
@@ -715,7 +715,7 @@ If you launch MORE than 43,008 threads worth of blocks, the extra blocks wait in
 
 ## Tensor Cores vs CUDA Cores for Matmul
 
-I had a doubt: if we have 128 CUDA cores but only 4 tensor cores per SM, aren't 4 tensor cores too little for huge matrix multiplications?
+A common question arises: if we have 128 CUDA cores but only 4 tensor cores per SM, aren't 4 tensor cores too little for huge matrix multiplications?
 
 **A tensor core is NOT like a CUDA core.** Don't think of "4 tensor cores" as "4 tiny things."
 
@@ -764,7 +764,7 @@ Hardware does: Register ← L1 ← L2 ← VRAM (caches along the way automatical
 
 ---
 
-## Full RTX 3060 Specs Summary Table
+## Full RTX 3060 Specifications Summary Table
 
 | Property | Value | Meaning |
 |---|---|---|

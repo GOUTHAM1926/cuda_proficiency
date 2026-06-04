@@ -670,9 +670,14 @@ You write `my_kernel<<<2,000,000, 256>>>()`.
 1. You are initializing a software grid of 2,000,000 blocks.
 2. Because you chose **256 threads per block**, the "Tightest Limit" rule kicks in. The SM can only handle 1536 threads total.
 3. 1536 / 256 = **6 blocks per SM**.
-4. Across the whole GPU (28 SMs), the hardware can physically execute **168 blocks simultaneously** (28 SMs × 6 blocks).
+4. Across the whole GPU (28 SMs), the hardware can physically hold **168 blocks resident simultaneously** (28 SMs × 6 blocks).
 
-So, the GPU hardware scheduler loads the first 168 blocks into the SMs for execution. The remaining 1,999,832 blocks are held in the hardware queue. As soon as one block completes its execution and frees its resources on an SM, the scheduler immediately dispatches the next block from the queue to take its place. This process repeats seamlessly until all 2 million blocks are processed.
+**The Dynamic Dispatch (The Conveyor Belt):**
+The GPU hardware scheduler (the Gigathread Engine) loads the first 168 blocks onto the SMs for execution. The remaining 1,999,832 blocks wait in the hardware queue. 
+Here is the critical detail: **The SM does NOT wait for all 6 blocks to finish before loading more.**
+As soon as *one single block* completes its instructions and frees its threads/registers, the scheduler grabs the very next block from the queue and shoves it onto the SM instantly. It is a continuous, dynamic conveyor belt replacing blocks one-by-one to maintain 100% occupancy. 
+
+*(Note on execution time: A single clock cycle only processes ONE instruction for a warp. Because a kernel has hundreds of instructions and memory fetches, it takes thousands or tens of thousands of clock cycles to complete a single block, not just 2 clock cycles).*
 
 ### Why do grids and blocks have X, Y, Z dimensions?
 

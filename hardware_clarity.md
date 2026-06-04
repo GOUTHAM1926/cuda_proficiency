@@ -303,9 +303,14 @@ You write `my_kernel<<<2,000,000, 256>>>()`.
 1. You are initializing a software grid of 2,000,000 blocks.
 2. Because you chose **256 threads per block**, the "Tightest Limit" rule kicks in. The SM can only handle 1536 threads total.
 3. 1536 / 256 = **6 blocks per SM**.
-4. Across the whole GPU (28 SMs), the hardware can physically execute **168 blocks simultaneously** (28 SMs × 6 blocks).
+4. Across the whole GPU (28 SMs), the hardware can physically hold **168 blocks resident simultaneously** (28 SMs × 6 blocks).
 
-So, the GPU hardware scheduler loads the first 168 blocks into the SMs for execution. The remaining 1,999,832 blocks are held in the hardware queue. As soon as one block completes its execution and frees its resources on an SM, the scheduler immediately dispatches the next block from the queue to take its place. This process repeats seamlessly until all 2 million blocks are processed.
+**The Dynamic Dispatch (The Conveyor Belt):**
+The GPU hardware scheduler (the Gigathread Engine) loads the first 168 blocks onto the SMs for execution. The remaining 1,999,832 blocks wait in the hardware queue. 
+Here is the critical detail: **The SM does NOT wait for all 6 blocks to finish before loading more.**
+As soon as *one single block* completes its instructions and frees its threads/registers, the scheduler grabs the very next block from the queue and shoves it onto the SM instantly. It is a continuous, dynamic conveyor belt replacing blocks one-by-one to maintain 100% occupancy. 
+
+*(Note on execution time: A single clock cycle only processes ONE instruction for a warp. Because a kernel has hundreds of instructions and memory fetches, it takes thousands or tens of thousands of clock cycles to complete a single block, not just 2 clock cycles).*
 
 ### Why do grids and blocks have X, Y, Z dimensions?
 
@@ -526,24 +531,46 @@ Registers are **private to each thread**. Thread 0 cannot see Thread 1's registe
 
 ### Why Registers per Block = Registers per SM = 65,536?
 
-Both are 65,536 because:
+**The byte-level math:**
+Each register is **32 bits = 4 bytes**. The SM has a **256 KB register file** (physical SRAM on the chip).
+256 KB = 256 × 1024 = 262,144 bytes.
+262,144 bytes ÷ 4 bytes per register = **65,536 registers**. That is the physical pool.
+
+**Why are "per Block" and "per SM" the same number?**
 
 - **Registers per SM = 65,536** → The SM has a physical pool of 65,536 registers. This is the hardware total.
 - **Registers per Block = 65,536** → A single block is ALLOWED to consume up to ALL 65,536 registers on the SM.
 
-This means one block CAN use the entire register file. But if it does, NO other block can run on that SM at the same time (zero registers left for a second block).
+These being equal means NVIDIA placed **no artificial per-block cap** on this GPU. A single block is allowed to consume the entire register file if needed. But if it does, NO other block can run on that SM at the same time (zero registers left for a second block).
+
+Not all GPUs have this property. On some older architectures, the per-block cap was lower than the per-SM total (e.g., a block could only use 32,768 registers even though the SM had 65,536). On the RTX 3060 (CC 8.6), they happen to be equal.
+
+**Worked example: Can a single block really consume all 65,536 registers?**
+
+Yes. Let's prove it:
 
 ```
-Case A: One block uses all 65,536 registers
-  → Only 1 block fits on the SM
-  → Other blocks must wait in queue
+65536/255 = 257.003.. = ~257
+Kernel config: 257 threads per block, 255 registers per thread, 0 KB shared memory.
 
-Case B: Each block uses 8,192 registers
-  → 65,536 / 8,192 = 8 blocks could fit (register-wise)
-  → But other limits (threads, shared mem, block count) may be tighter
+Step 1 — Register demand:
+  257 threads × 255 registers/thread = 65,535 registers needed.
+  The SM has 65,536 registers. This fits (barely — only 1 register left over).
+
+Step 2 — Apply all 4 limits:
+  Block Limit:    16 blocks max  →  could fit 16
+  Thread Limit:   1536 / 257     →  could fit 5 blocks (5 × 257 = 1285 threads)
+  Shared Limit:   0 KB used      →  unlimited
+  Register Limit: 65,536 / 65,535 → could fit 1 block (a second block would need 131,070 registers)
+
+  TIGHTEST = 1 block (register bottleneck)
+
+Step 3 — Occupancy:
+  1 block × 257 threads = 257 active threads on the SM.
+  Occupancy = 257 / 1536 = 16.7%
 ```
 
-Not all GPUs have this property. On some architectures, the per-block cap is lower than the per-SM total. On the RTX 3060 (CC 8.6), they happen to be equal — meaning no artificial per-block cap on registers.
+This is a valid configuration. The GPU will execute it. But 16.7% occupancy means only 8 warps (257 threads ÷ 32 = 8.03 → only 8 full warps) are active, so latency hiding is severely limited. This configuration only makes sense for compute-bound kernels where every thread needs maximum register space for local data.
 
 ### How many registers does each thread get?
 

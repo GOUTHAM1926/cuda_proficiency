@@ -40,3 +40,20 @@ int main() {
     
     return 0;
 }
+
+/*
+ * ============================================
+ *  HOW TO COMPILE AND RUN
+ * ============================================
+ *
+ *  Compile:
+ *    nvcc device_query.cu -o device_query
+ *
+ *  Run:
+ *    ./device_query
+ *
+ *  One-liner:
+ *    nvcc device_query.cu -o device_query && ./device_query
+ *
+ * ============================================
+ */

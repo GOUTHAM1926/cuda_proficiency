@@ -673,9 +673,9 @@ You write `my_kernel<<<2,000,000, 256>>>()`.
 4. Across the whole GPU (28 SMs), the hardware can physically hold **168 blocks resident simultaneously** (28 SMs × 6 blocks).
 
 **The Dynamic Dispatch (The Conveyor Belt):**
-The GPU hardware scheduler (the Gigathread Engine) loads the first 168 blocks onto the SMs for execution. The remaining 1,999,832 blocks wait in the hardware queue. 
+The GPU hardware scheduler (the Gigathread Engine) loads the first 168 blocks onto the SMs for execution. The remaining 1,999,832 blocks wait in the hardware queue.
 Here is the critical detail: **The SM does NOT wait for all 6 blocks to finish before loading more.**
-As soon as *one single block* completes its instructions and frees its threads/registers, the scheduler grabs the very next block from the queue and shoves it onto the SM instantly. It is a continuous, dynamic conveyor belt replacing blocks one-by-one to maintain 100% occupancy. 
+As soon as *one single block* completes its instructions and frees its threads/registers, the scheduler grabs the very next block from the queue and shoves it onto the SM instantly. It is a continuous, dynamic conveyor belt replacing blocks one-by-one to maintain 100% occupancy.
 
 *(Note on execution time: A single clock cycle only processes ONE instruction for a warp. Because a kernel has hundreds of instructions and memory fetches, it takes thousands or tens of thousands of clock cycles to complete a single block, not just 2 clock cycles).*
 
@@ -805,6 +805,134 @@ Actually executing:       28 × 4 × 32 = 3,584 threads (at any one clock cycle)
 ```
 
 If you launch MORE than 43,008 threads worth of blocks, the extra blocks wait in a hardware queue. As running blocks finish, the GPU assigns waiting blocks to free SM slots.
+
+---
+
+## Warp Execution: Loop Unrolling and Warp Divergence
+
+To truly understand how GPU hardware optimizes code, we must look at how the compiler and the SM execute instructions across threads. Two of the most critical concepts are **Loop Unrolling** and **Warp Divergence**.
+
+### What is Loop Unrolling?
+
+**Loop Unrolling** is an extremely powerful optimization technique performed entirely by the **compiler at compile-time** (long before the code ever reaches the GPU hardware).
+
+A normal loop is computationally expensive because of hidden "bookkeeping" overhead. Let's look at a simple, 4-iteration addition loop:
+
+```cpp
+// A simple loop adding 4 numbers
+float sum = 0.0f;
+for (int i = 0; i < 4; i++) {
+    sum += array[i];
+}
+```
+
+When you write this, you might think the hardware only executes 4 addition instructions. In reality, **every single time** the loop iterates, the hardware must execute several invisible bookkeeping instructions:
+
+1. **The Math:** `sum += array[i]` (The actual useful work)
+2. **The Counter Update:** `i++` (Add 1 to `i`)
+3. **The Condition Check:** `i < 4` (Is `i` still less than 4?)
+4. **The Branch Jump:** `JMP` (Jump the program counter back to the top of the loop)
+
+For a 4-iteration loop, the hardware actually executes **16 instructions** (4 useful additions + 12 bookkeeping instructions). Those bookkeeping instructions do absolutely zero useful math—they just keep the loop machinery turning, wasting precious clock cycles and potentially stalling the execution pipeline.
+
+**How the Compiler Fixes This (Unrolling):**
+Because the loop bounds (`i = 0` to `i < 4`) are **constant and explicitly known**, the compiler recognizes this at compile-time. It thinks: *"I know exactly how many times this will run. Why make the hardware jump in circles at runtime?"*
+
+The compiler literally deletes the loop machinery entirely and "unrolls" your code into a straight line, substituting the loop counter `i` with the actual hardcoded values:
+
+```cpp
+// How the compiler actually rewrites your code behind the scenes:
+float sum = 0.0f;
+sum += array[0]; // Iteration 0
+sum += array[1]; // Iteration 1
+sum += array[2]; // Iteration 2
+sum += array[3]; // Iteration 3
+```
+
+**Why is it such a massive optimization?**
+By removing the `i++` updates, the `< 4` checks, and the `JMP` branches, the execution drops from 16 instructions down to just **4 instructions**.
+
+1. **Zero Overhead:** 100% of the clock cycles are now spent doing actual mathematical work.
+2. **No Branching Stalls:** Jump/branch instructions can cause the GPU's instruction pipeline to pause (stall). Straight-line code flows perfectly through the hardware.
+3. **Instruction-Level Parallelism:** Because the instructions are laid out flat, the compiler can look ahead and schedule independent memory loads (like grabbing `array[0]` and `array[1]`) to happen simultaneously.
+
+### What is Warp Divergence?
+
+To understand divergence, you must first know what a **Warp** is. On the GPU, threads do not execute independently. The hardware physically groups threads into bundles of 32 called **warps**. All 32 threads in a warp run in **lockstep** — they share a single Program Counter and are forced to execute the *exact same instruction at the exact same time*.
+
+**Warp divergence** occurs when the 32 threads in a warp are forced onto different execution paths.
+
+Imagine you write a `while` loop that stops processing when a specific condition is met, and that condition depends on the specific data each thread is handling (a *data-dependent loop*):
+
+```cpp
+// A data-dependent loop
+while (data_value != 0) {
+    // do work
+    data_value = data_value / 2;
+}
+```
+
+If Thread 0 needs 5 passes through the loop, but Thread 1 only needs 1 pass, what does the hardware do?
+Since they are bound together in the same warp, they *cannot* separate. The hardware **serializes** the execution. It forces the warp to keep looping until the *slowest* thread (Thread 0) is completely finished. During passes 2, 3, 4, and 5, Thread 1 is "masked off" — it just sits idle, wasting clock cycles.
+
+This is warp divergence: 32 threads that should have worked perfectly in parallel end up taking turns or waiting on each other, drastically reducing your hardware efficiency.
+
+### The Connection (The Link)
+
+The relationship between these two concepts is fundamental: **You cannot have one without the other.**
+
+1. **If you have Warp Divergence, Loop Unrolling is Impossible:**
+If you write a loop whose pass count depends on thread-specific data, the compiler *cannot* unroll it at compile-time because it doesn't know how many times it needs to repeat the code. Because the loop bounds are variable, the hardware must evaluate them at runtime, leading directly to warp divergence.
+
+2. **If you fix the bounds, you kill Divergence and unlock Unrolling:**
+By designing your algorithms to use fixed, constant loop bounds, you guarantee that every single thread in the warp runs the loop the exact same number of times. This completely eliminates warp divergence (no thread ever waits for another). Because the loop is fixed, the compiler gains the mathematical certainty it needs to flatten your code into hyper-fast, unrolled instructions.
+
+In short: **Constant loop bounds are the key.** They keep your warps synchronized (killing divergence) while simultaneously allowing the compiler to rip out the overhead (enabling loop unrolling).
+
+**Let's Look at a Direct Example Connecting Both:**
+
+*(For a deeper mathematical dive into this specific problem, see Section **"4. Mathematical Proofs & Loop Edge-Cases"** in `data_accessing_techniques.md`).*
+
+**The Context (The Problem):**
+Imagine we have a 3D tensor of shape `[2, 3, 4]`. We want to convert a flat 1D `linear_idx` (like 14 or 2) into 3D coordinates `(depth, row, col)`. To do this, we repeatedly divide by the dimension size and take the remainder.
+
+There are two ways to write the loop that does this:
+
+**1. The "Bad" Way (Stopping when `linear_idx` becomes 0):**
+
+```cpp
+while (linear_idx != 0) {
+    // Process one dimension
+    coord = linear_idx % size;
+    linear_idx = linear_idx / size;
+}
+```
+
+- **Why it seems logical at first:** If our `linear_idx` becomes 0 after peeling off the innermost dimensions, why keep doing math? It seems faster to just stop early.
+
+- **The Reality:**
+  - **Thread A** is given `linear_idx = 14`. It takes **3 passes** for the number to reach 0.
+  - **Thread B** is given `linear_idx = 2`. It takes **1 pass** for the number to reach 0.
+- **The Result on Divergence:** Because Thread B finishes in 1 pass while Thread A takes 3, Thread B is forced to sit completely idle (wasting cycles) while Thread A finishes passes 2 and 3. The warp has **diverged**.
+- **The Result on Unrolling:** The compiler looks at this code and says, "I don't know how many times this loop will run—it depends entirely on what `linear_idx` the thread is given at runtime." Therefore, it **cannot** unroll the code. All loop bookkeeping overhead remains.
+
+**2. The "Good" Way (Stopping when all dimensions are completed):**
+
+```cpp
+// For a 3D tensor, dims = 3.
+for (int d = dims - 1; d >= 0; d--) {
+    // Process one dimension
+    coord[d] = linear_idx % sizes[d];
+    linear_idx = linear_idx / sizes[d];
+}
+```
+
+- **Why it is mathematically correct:** Even if `linear_idx` reaches 0 early (like for Thread B), we *must* continue the loop to ensure the outermost dimensions explicitly get set to `0` (e.g., coordinate `[0, 0, 2]`). If we stop early, those outer coordinates are left uninitialized (garbage memory)!
+
+- **The Result on Divergence:** Because `dims` is always 3 for a 3D tensor, **Thread A** and **Thread B** both run the loop exactly **3 times**, regardless of what their `linear_idx` is. Both threads execute in perfect lockstep. No one finishes early, no one waits. Warp divergence is **completely killed**.
+- **The Result on Unrolling:** The compiler looks at this code and says, "Ah, this loop always runs exactly 3 times for every single thread, guaranteed." It safely deletes the `for` loop machinery and writes the math instructions out 3 times in a straight line (unrolling it).
+
+This is the link: **by forcing the loop to run for all dimensions instead of stopping at 0, we ensure mathematical correctness, kill warp divergence, and unlock loop unrolling all at the same time.**
 
 ---
 

@@ -4,17 +4,19 @@ Goal: verify, against NVIDIA docs AND on real hardware, whether `cp.async` copie
 global→shared memory **without staging through registers**.
 
 ## Verdict
+
 The colleague is **correct on the main point**: with `cp.async`, registers are
 bypassed. There is one nuance the diagram got slightly wrong about **L1**.
 
 | Claim | Verdict |
 |---|---|
-| Without cp.async: VRAM→L2→L1→**Register**→Shared (LDG then STS) | ✅ TRUE |
-| With cp.async: registers are bypassed | ✅ TRUE (proven 3 ways) |
-| With cp.async: VRAM→L2→**Shared** (L1 also skipped) | ⚠️ only for 16-byte / `.cg`. Small (4/8B) async copies still go through L1 |
-| Math phase: Shared→Register→ALU (can't compute straight from shared) | ✅ TRUE |
+| Without cp.async: VRAM→L2→L1→**Register**→Shared (LDG then STS) | TRUE |
+| With cp.async: registers are bypassed |  TRUE (proven 3 ways) |
+| With cp.async: VRAM→L2→**Shared** (L1 also skipped) |  only for 16-byte / `.cg`. Small (4/8B) async copies still go through L1 |
+| Math phase: Shared→Register→ALU (can't compute straight from shared) |  TRUE |
 
 ## Proof 1 — instruction-level (SASS, `cuobjdump -sass 01.o`)
+
 ```
 copy_sync      : LDG.E.CONSTANT R2, [R2.64]   ; global -> register R2
                  STS [R9.X4], R2              ; register R2 -> shared   (2 instr, reg in the middle)
@@ -22,10 +24,12 @@ copy_sync      : LDG.E.CONSTANT R2, [R2.64]   ; global -> register R2
 copy_async4    : LDGSTS.E         [R7], [R2.64]   ; 4B  global -> shared, NO data reg (L1 ACCESS)
 copy_async16   : LDGSTS.E.BYPASS.128 [R7], [R2.64]; 16B global -> shared, NO data reg, L1 BYPASS
 ```
+
 `cp.async` becomes a single **LDGSTS** instruction with no destination data register.
 The 16-byte form literally carries `.BYPASS` (skips L1); the 4-byte form does not.
 
 ## Proof 2 — profiler instruction counts (`ncu`, pure-copy kernel, identical work)
+
 | metric | sync | async |
 |---|---|---|
 | global loads (LDG) | 33,554,432 | **0** |
@@ -35,12 +39,14 @@ The 16-byte form literally carries `.BYPASS` (skips L1); the 4-byte form does no
 
 Sync: every element = 1 LDG + 1 STS (staged in a register). Async: 0 LDG/STS, all LDGSTS.
 
-## Proof 3 — timings (`./bench`). async is NOT automatically faster.
+## Proof 3 — timings (`./bench`). async is NOT automatically faster
+
 ```
 TEST 1 pure copy (no math):           sync 13.4 ms / 322 GB/s   async 15.0 ms / 287 GB/s   x0.89
 TEST 2 load+compute, HIGH occupancy:  sync 14.3 ms              async 15.6 ms              x0.92
 TEST 3 load+compute, LOW occupancy:   sync  1.21 ms             async  1.11 ms             x1.09
 ```
+
 - When **bandwidth-bound with full occupancy**, other warps already hide load latency
   (TLP), so async's overhead makes it slightly slower.
 - When **latency-bound (few warps / low occupancy)**, async double-buffering overlaps the
@@ -49,16 +55,19 @@ TEST 3 load+compute, LOW occupancy:   sync  1.21 ms             async  1.11 ms  
   **overlap of copy with compute**, not a faster raw copy.
 
 ## Proof 4 — BIG real workload: 4096x4096 tiled SGEMM (`./gemm`)
+
 ```
 sync  tiled GEMM :  144.5 ms    951 GFLOP/s
 async tiled GEMM :  132.7 ms   1036 GFLOP/s   -> x1.09, results bit-identical (maxdiff 0)
 ```
+
 SASS of the GEMM kernels: `gemm_sync` contains only `LDG.E.CONSTANT` + `STS`;
 `gemm_async` contains `LDGSTS.E` (the double-buffered tile prefetches). Double-buffering
 costs 2x shared mem (16384 vs 8192 bytes/block) but overlaps the next tile's copy with the
 current tile's multiply -> ~9% faster on a 137 GFLOP job, exactly correct numerically.
 
 ## Doc sources (exact quotes)
+
 - CUDA C++ Programming Guide, Asynchronous Data Copies / Advanced Kernel Programming:
   "Copying 4 or 8 bytes always happens in the so called L1 ACCESS mode, in which case
   data is also cached in the L1, while copying 16-bytes enables the L1 BYPASS mode, in
@@ -70,6 +79,7 @@ current tile's multiply -> ~9% faster on a 137 GFLOP job, exactly correct numeri
   L1) is allowed only when cp-size is 16 bytes.
 
 ## How to reproduce
+
 ```
 nvcc -arch=sm_86 -O3 --ptxas-options=-v -c 01_sass_proof.cu -o 01.o
 cuobjdump -sass 01.o | grep -E "Function|LDG|STS|LDGSTS"

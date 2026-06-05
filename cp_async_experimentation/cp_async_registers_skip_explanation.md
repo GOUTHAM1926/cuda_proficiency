@@ -358,7 +358,7 @@ Its real value is register/occupancy savings and overlapping copy with compute.
 - **Primary purpose: bypass registers + copy asynchronously.** Bypassing L1 is a secondary,
   size-dependent bonus.
 - **Sizes: 4 / 8 / 16 bytes**, each requiring matching address alignment. Registers are
-  bypassed for all three; only **16-byte** copies also bypass **L1**.
+  bypassed for all three; only **16-byte** copies  bypass **L1**.
 - Verified by official NVIDIA documentation and proven on the **RTX 3060** four ways: SASS
   instructions, profiler counts, timings, and a 4096×4096 GEMM.
 
@@ -389,7 +389,7 @@ Its real value is register/occupancy savings and overlapping copy with compute.
 - [async_copy_investigation/01_sass_proof.cu](async_copy_investigation/01_sass_proof.cu) — SASS proof (`LDG`+`STS` vs `LDGSTS`)
 - [async_copy_investigation/02_bench.cu](async_copy_investigation/02_bench.cu) — pure-copy + load+compute timings
 - [async_copy_investigation/03_gemm.cu](async_copy_investigation/03_gemm.cu) — 4096×4096 tiled GEMM, sync vs async
-- [async_copy_investigation/FINDINGS.md](async_copy_investigation/FINDINGS.md) — condensed results + reproduce commands
+- [async_copy_investigation/Benchmark_tests_results_cpasync_vs_synchronous_copy.md](Benchmark_tests_results_cpasync_vs_synchronous_copy.md) — condensed results + reproduce commands
 
 **Hardware:** NVIDIA GeForce RTX 3060 (Ampere, Compute Capability 8.6). **Toolkit:** CUDA 11.5
 (`nvcc`); profiled with Nsight Compute.

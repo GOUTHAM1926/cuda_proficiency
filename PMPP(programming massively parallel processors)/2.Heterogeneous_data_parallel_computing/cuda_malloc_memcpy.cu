@@ -1,3 +1,6 @@
+// refer 2.4 section documentation file : PMPP(programming massively parallel
+// processors)/2.Heterogeneous_data_parallel_computing/2.4_Device_global_memory_and_data_transfer.md
+// for full and clearinfo on all these experimentations ,,, ,
 #include <cuda_runtime.h>
 #include <iostream>
 

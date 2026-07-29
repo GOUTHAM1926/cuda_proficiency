@@ -1,6 +1,6 @@
 # CUDA Proficiency
 
-Refer these documentations and experiments done by me, if you want to become a best GPU programmer or performance engineer — **Gautam_1926**
+Refer these documentations and experiments done by me, if you want to become a best GPU programmer or performance engineer(GPU & AI) — **Gautam_1926**
 
 ---
 

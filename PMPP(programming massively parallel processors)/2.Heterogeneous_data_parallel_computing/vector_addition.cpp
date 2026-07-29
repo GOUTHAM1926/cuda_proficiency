@@ -1,3 +1,6 @@
+// refer 2.3 section documentation file : PMPP(programming massively parallel
+// processors)/2.Heterogeneous_data_parallel_computing/2.3_Vector_Addition_Kernel.md
+// for full clear info on everythin of these experiments
 /*
 =============================================================================
 A NOTE ON COMPILING C++ AS CUDA:
@@ -11,15 +14,17 @@ that can flawlessly compile standard CPU C++ code and GPU code together!
 #include <iostream>
 #include <vector>
 using namespace std;
-// void vecadd(float *A, float *B, float *C, int N) {
-//   for (int i = 0; i < N; ++i) {
-//     C[i] = A[i] + B[i];
-//   }
-// }
-// int main() {
-//   int N = 10;
-//   float *A = new float[N];
-//   float *B = new float[N];
+// Experiemnt-1
+// using arrays and not std::vector
+//  void vecadd(float *A, float *B, float *C, int N) {
+//    for (int i = 0; i < N; ++i) {
+//      C[i] = A[i] + B[i];
+//    }
+//  }
+//  int main() {
+//    int N = 10;
+//    float *A = new float[N];
+//    float *B = new float[N];
 
 //   // WARNING: 'new float[N]' (and C's malloc) does NOT guarantee
 //   zero-initialization!
@@ -55,15 +60,16 @@ using namespace std;
 //   return 0;
 // }
 
-// Pass std::vector by reference.
-// A and B can be "const since we don't change them.
-// C is a normal reference so we can modify its elements.
-// void vecadd(const std::vector<float> &A, const std::vector<float> &B,
-//             std::vector<float> &C, int N) {
-//   for (int i = 0; i < N; i++) {
-//     C[i] = A[i] + B[i];
-//   }
-// }
+// Experiemnt -2
+//  Pass std::vector by reference.
+//  A and B can be "const since we don't change them.
+//  C is a normal reference so we can modify its elements.
+//  void vecadd(const std::vector<float> &A, const std::vector<float> &B,
+//              std::vector<float> &C, int N) {
+//    for (int i = 0; i < N; i++) {
+//      C[i] = A[i] + B[i];
+//    }
+//  }
 
 // int main() {
 //   int N = 10;
@@ -93,11 +99,12 @@ using namespace std;
 //   return 0;
 // }
 
-// Pass by Value (WARNING: THIS HAS A HUGE BUG!)
-// Because C is passed by value (no '&'), this function receives a deep COPY of
-// C. It successfully calculates A + B and stores it in the copy of C. But as
-// soon as the function ends, that copy is deleted and thrown away! The original
-// vector C inside main() is never touched and remains all zeroes.
+// Experiemnt - 3
+//  Pass by Value (WARNING: THIS HAS A HUGE BUG!)
+//  Because C is passed by value (no '&'), this function receives a deep COPY of
+//  C. It successfully calculates A + B and stores it in the copy of C. But as
+//  soon as the function ends, that copy is deleted and thrown away! The
+//  original vector C inside main() is never touched and remains all zeroes.
 void vecadd(std::vector<float> A, std::vector<float> B, std::vector<float> C,
             int N) {
   for (int i = 0; i < N; ++i) {

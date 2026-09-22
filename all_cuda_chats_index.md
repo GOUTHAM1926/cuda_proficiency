@@ -1,6 +1,6 @@
 # 🗂️ CUDA Proficiency — Chat Sessions Index
 
-> **Last Updated:** 2026-08-03  
+> **Last Updated:** 2026-09-21  
 > **Scope:** ONLY chats that directly contributed to files inside `cuda_proficiency/`  
 > **How to use:** Copy the **Conversation ID** → Tell Antigravity: _"Bring everything from conversation `<ID>`"_
 
@@ -25,17 +25,17 @@
 | 13 | **2026-07-25** | 📖 **PMPP Ch.2 — C++ Vectors & CUDA Memory Models** — `std::vector` operations, zero-initialization, pass by reference, `vector_addition.cpp` | `vector_addition.cpp`, `PMPP/.../2.3_Vector_Addition_Kernel.md` | `b8162c52-55e9-44d4-8730-f7d27e733461` |
 | 14 | **2026-07-27** | 📖 **PMPP §2.4 — CUDA Context & Memory** — Empirical CUDA context memory "tax" (~96-100 MB), `htop`/`nvidia-smi` experiments, `cuda_malloc.cu` | `cuda_malloc.cu`, `vector_addition.cpp`, `README.md` | `91d60968-a8c2-41a7-a947-11b19d8822f1` |
 | 15 | **2026-07-29** | 📖 **PMPP §2.4 — CUDA Error Handling** — `cudaError_t` experiments, API behaviors, pointer safety, compiler casting, textbook errata | `test_free.cu`, `README.md` | `99f8ca49-61a9-4fb1-8e44-b08d139f52d9` |
-
+| 16 | **2026-09-21** | 📖 **PMPP §2.4 & §2.5 — Threading & Memory Transfers** — `cudaMemcpy` workflow diagrams, SPMD vs SIMD (SIMT), Grid/Block Hierarchy, `dim3` vs `uint3` data types | `2.4_Device_global_memory_and_data_transfer.md`, `2.5_Kernel_Functions_and_threading.md` | `5ae62052-51fd-4235-8bf6-bff56194dc5e` |
 ---
 
 ## 📊 Summary
 
 | Metric | Value |
 |--------|-------|
-| **Total chats for this workspace** | **15** |
-| **Date Range** | 2026-04-23 → 2026-07-29 |
+| **Total chats for this workspace** | **16** |
+| **Date Range** | 2026-04-23 → 2026-09-21 |
 | **Books covered** | PMPP (Ch.1 & Ch.2), CUDA for Engineers (Appendix A, B, C) |
-| **Current progress** | PMPP §2.4 — Device Global Memory & Data Transfer |
+| **Current progress** | PMPP §2.5 — Kernel Functions and Threading |
 
 ---
 

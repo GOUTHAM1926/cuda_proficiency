@@ -1,6 +1,6 @@
 # 🗂️ CUDA Proficiency — Chat Sessions Index
 
-> **Last Updated:** 2026-09-22  
+> **Last Updated:** 2026-09-23  
 > **Scope:** ONLY chats that directly contributed to files inside `cuda_proficiency/`  
 > **How to use:** Copy the **Conversation ID** → Tell Antigravity: _"Bring everything from conversation `<ID>`"_
 
@@ -27,16 +27,18 @@
 | 15 | **2026-07-29** | 📖 **PMPP §2.4 — CUDA Error Handling** — `cudaError_t` experiments, API behaviors, pointer safety, compiler casting, textbook errata | `test_free.cu`, `README.md` | `99f8ca49-61a9-4fb1-8e44-b08d139f52d9` |
 | 16 | **2026-09-21** | 📖 **PMPP §2.4 & §2.5 — Threading & Memory Transfers** — `cudaMemcpy` workflow diagrams, SPMD vs SIMD (SIMT), Grid/Block Hierarchy, `dim3` vs `uint3` data types | `2.4_Device_global_memory_and_data_transfer.md`, `2.5_Kernel_Functions_and_threading.md` | `5ae62052-51fd-4235-8bf6-bff56194dc5e` |
 | 17 | **2026-09-22** | 📖 **PMPP §2.5 Continued — Telephone Analogy, blockIdx & Global Index** — US telephone hierarchy explained with Indian STD comparison, "dial 1" / "no local starts with 1" ambiguity rule, `blockIdx` as common block coordinate, `threadIdx` resets per block, global index formula `i = blockIdx.x * blockDim.x + threadIdx.x` worked examples, launch ≥ n threads to cover n elements (ties to ceiling division) | `2.5_Kernel_Functions_and_threading.md` | `6f7a0408-2e43-4f6b-9472-704aeb1579e3` |
+| 18 | **2026-09-23** | 📖 **PMPP §2.5 Completed** — Documented `vecAddKernel` line-by-line, hardware coordinate registers vs computation registers, `__global__` and `__host__` compilation logic, loop parallelism, and bounds checking (`i < n`). | `2.5_Kernel_Functions_and_threading.md` | `97e012d0-53dd-4bc9-9e6b-42b176cca929` |
+| 19 | **2026-10-07** | 📖 **PMPP §2.6 — Calling Kernel Functions** — `<<<...>>>` launch syntax, ceiling division deep-dive (integer vs float division trap), complete `vecAdd` host code (Fig 2.12 & 2.13), arbitrary block execution order, transparent scalability with real GPU comparisons (GTX 1650/RTX 3060/RTX 4090/A100), and ALL block size factors pulled from Ch.4 & Ch.5 (warp alignment, occupancy, registers, shared memory, performance cliffs) | `2.6_Calling_kernel_functions.md`, `fig_2.12_kernel_call_statement.png`, `fig_2.13_complete_vecAdd_host_code.png` | `af0ddda6-31e4-4b38-9794-be45ba0632f0` |
 ---
 
 ## 📊 Summary
 
 | Metric | Value |
 |--------|-------|
-| **Total chats for this workspace** | **17** |
-| **Date Range** | 2026-04-23 → 2026-09-22 |
+| **Total chats for this workspace** | **19** |
+| **Date Range** | 2026-04-23 → 2026-10-07 |
 | **Books covered** | PMPP (Ch.1 & Ch.2), CUDA for Engineers (Appendix A, B, C) |
-| **Current progress** | PMPP §2.5 — Kernel Functions and Threading (mid-section, next: continue with next textbook paragraph after the global index / `blockIdx` coverage) |
+| **Current progress** | PMPP §2.6 completed (Calling Kernel Functions). Next: start §2.7 or Ch.3 |
 
 ---
 

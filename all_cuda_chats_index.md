@@ -29,16 +29,17 @@
 | 17 | **2026-09-22** | 📖 **PMPP §2.5 Continued — Telephone Analogy, blockIdx & Global Index** — US telephone hierarchy explained with Indian STD comparison, "dial 1" / "no local starts with 1" ambiguity rule, `blockIdx` as common block coordinate, `threadIdx` resets per block, global index formula `i = blockIdx.x * blockDim.x + threadIdx.x` worked examples, launch ≥ n threads to cover n elements (ties to ceiling division) | `2.5_Kernel_Functions_and_threading.md` | `6f7a0408-2e43-4f6b-9472-704aeb1579e3` |
 | 18 | **2026-09-23** | 📖 **PMPP §2.5 Completed** — Documented `vecAddKernel` line-by-line, hardware coordinate registers vs computation registers, `__global__` and `__host__` compilation logic, loop parallelism, and bounds checking (`i < n`). | `2.5_Kernel_Functions_and_threading.md` | `97e012d0-53dd-4bc9-9e6b-42b176cca929` |
 | 19 | **2026-10-07** | 📖 **PMPP §2.6 — Calling Kernel Functions** — `<<<...>>>` launch syntax, ceiling division deep-dive (integer vs float division trap), complete `vecAdd` host code (Fig 2.12 & 2.13), arbitrary block execution order, transparent scalability with real GPU comparisons (GTX 1650/RTX 3060/RTX 4090/A100), and ALL block size factors pulled from Ch.4 & Ch.5 (warp alignment, occupancy, registers, shared memory, performance cliffs) | `2.6_Calling_kernel_functions.md`, `fig_2.12_kernel_call_statement.png`, `fig_2.13_complete_vecAdd_host_code.png` | `af0ddda6-31e4-4b38-9794-be45ba0632f0` |
+| 20 | **2026-10-08** | 📖 **PMPP §2.7 — Compilation** — `nvcc` as Compiler Driver (Host path → `gcc`, Device path → NVIDIA pipeline), PTX (intermediate code, like Java Bytecode) vs SASS (real machine binary), Fatbinary (one executable containing both SASS + PTX, proved with `cuobjdump`), JIT compilation by CUDA Driver (not `nvcc`!) as a runtime fallback, compile-time vs runtime flow diagram, Forward vs Backward Compatibility (hardware AND software perspectives), CPU vs GPU compatibility differences, Figure 2.14 saved | `2.7_Compilation.md`, `fig_2.14_compilation_process.png` | `80351f71-841c-40c6-beb3-06168e1a95c4` |
 ---
 
 ## 📊 Summary
 
 | Metric | Value |
 |--------|-------|
-| **Total chats for this workspace** | **19** |
-| **Date Range** | 2026-04-23 → 2026-10-07 |
+| **Total chats for this workspace** | **20** |
+| **Date Range** | 2026-04-23 → 2026-10-08 |
 | **Books covered** | PMPP (Ch.1 & Ch.2), CUDA for Engineers (Appendix A, B, C) |
-| **Current progress** | PMPP §2.6 completed (Calling Kernel Functions). Next: start §2.7 or Ch.3 |
+| **Current progress** | PMPP §2.7 completed (Compilation). Next: §2.8 or Ch.3 |
 
 ---
 

@@ -1,6 +1,6 @@
 # 🗂️ CUDA Proficiency — Chat Sessions Index
 
-> **Last Updated:** 2026-10-09  
+> **Last Updated:** 2026-10-15  
 > **Scope:** ONLY chats that directly contributed to files inside `cuda_proficiency/`  
 > **How to use:** Copy the **Conversation ID** → Tell Antigravity: _"Bring everything from conversation `<ID>`"_
 
@@ -31,16 +31,19 @@
 | 19 | **2026-10-07** | 📖 **PMPP §2.6 — Calling Kernel Functions** — `<<<...>>>` launch syntax, ceiling division deep-dive (integer vs float division trap), complete `vecAdd` host code (Fig 2.12 & 2.13), arbitrary block execution order, transparent scalability with real GPU comparisons (GTX 1650/RTX 3060/RTX 4090/A100), and ALL block size factors pulled from Ch.4 & Ch.5 (warp alignment, occupancy, registers, shared memory, performance cliffs) | `2.6_Calling_kernel_functions.md`, `fig_2.12_kernel_call_statement.png`, `fig_2.13_complete_vecAdd_host_code.png` | `af0ddda6-31e4-4b38-9794-be45ba0632f0` |
 | 20 | **2026-10-08** | 📖 **PMPP §2.7 — Compilation** — `nvcc` as Compiler Driver (Host path → `gcc`, Device path → NVIDIA pipeline), PTX (intermediate code, like Java Bytecode) vs SASS (real machine binary), Fatbinary (one executable containing both SASS + PTX, proved with `cuobjdump`), JIT compilation by CUDA Driver (not `nvcc`!) as a runtime fallback, compile-time vs runtime flow diagram, Forward vs Backward Compatibility (hardware AND software perspectives), CPU vs GPU compatibility differences, Figure 2.14 saved | `2.7_Compilation.md`, `fig_2.14_compilation_process.png` | `80351f71-841c-40c6-beb3-06168e1a95c4` |
 | 21 | **2026-10-09** | 📖 **PMPP §2.8 — Summary** — Chapter 2 wrap-up: Function declarations (`__global__`, `__device__`, `__host__`), kernel execution configurations (`<<<grid, block>>>`), built-in variables (`threadIdx`, `blockIdx`, `blockDim`), runtime API (`cudaMalloc`, `cudaMemcpy`, `cudaFree`), and authors' philosophy on consulting the official CUDA C Programming Guide. | `2.8_Summary.md` | `8f26808f-6790-401d-9774-4db2b76ae5b3` |
+| 22 | **2026-10-15** | 📖 **PMPP §2.9 — Exercises (Ex 1–5) & Deep Dive on Pointers & Memory** — Vector addition variations (Ex 1–3 with CUDA test code), Grid launch ceiling division calculations (Ex 4), `cudaMalloc` second argument byte requirements (Ex 5), complete C++ `new` vs `malloc` vs `cudaMalloc` trap breakdown (`new int[]` vs `new int()` vs `new 1000`), CPU stack pointer lifecycle (`A_d` stack box, `&A_d` coordinate, `*devPtr = gpu_addr` dereference write-back), printing `A_d` vs `*(&A_d)` vs `*A_d` (CPU segfault vs GPU value), and pointer arithmetic hop size rules. | `2.9_Exercises_Questions.md`, `2.4_Device_global_memory_and_data_transfer.md`, `Characterization_of_C.md`, `exercise_2_adjacent_elements.cu`, `exercise_3_sectioned_elements.cu` | `efe315e3-228f-484d-80f4-8be8e35d7b9d` |
+| 23 | **2026-10-16** | 📖 **PMPP §2.9 — Exercises (Ex 6–10 Completed!) & Deep Dive on Architecture Targeting, PTX JIT & Errors** — `cudaMalloc` first arg (`(void**)&A_d`), `cudaMemcpy` syntax & direction, `cudaError_t` type standards, grid execution configuration math ($N=200,000$, 128 threads/block, 1,563 blocks, 200,064 threads), boundary condition thread predication (`if (i < N)`), summer intern solution via `__host__ __device__`, `#ifdef __CUDA_ARCH__` macro values across GPU families, SFU hardware intrinsics (`__fsqrt_rn`), 3 missing instruction scenarios (`ptxas error`, Error 209 `cudaErrorNoKernelImageForDevice`, software emulation), live verified PTX forward JIT compilation (`compute_75` on RTX 3060) vs backward incompatibility (`compute_90` on RTX 3060), and production tiered architecture guarding pattern. **PMPP Chapter 2 100% COMPLETE!** | `2.9_Exercises_Questions.md`, `memory_note_next_session.md`, `all_cuda_chats_index.md` | `71d4755f-ce52-482d-8188-91e4ab32f174` |
 ---
 
 ## 📊 Summary
 
 | Metric | Value |
 |--------|-------|
-| **Total chats for this workspace** | **21** |
-| **Date Range** | 2026-04-23 → 2026-10-09 |
-| **Books covered** | PMPP (Ch.1 & Ch.2), CUDA for Engineers (Appendix A, B, C) |
-| **Current progress** | PMPP Chapter 2 completed (§2.8 Summary). Next: Chapter 3 |
+| **Total chats for this workspace** | **23** |
+| **Date Range** | 2026-04-23 → 2026-10-16 |
+| **Books covered** | PMPP (Ch.1 & Ch.2 Complete!), CUDA for Engineers (Appendix A, B, C) |
+| **Current progress** | **PMPP Chapter 2 100% COMPLETED (All 10 Exercises Solved & Documented). Next: Chapter 3 (Multidimensional Grids and Data)** |
+
 
 ---
 

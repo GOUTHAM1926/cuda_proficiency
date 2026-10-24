@@ -33,16 +33,17 @@
 | 21 | **2026-10-09** | 📖 **PMPP §2.8 — Summary** — Chapter 2 wrap-up: Function declarations (`__global__`, `__device__`, `__host__`), kernel execution configurations (`<<<grid, block>>>`), built-in variables (`threadIdx`, `blockIdx`, `blockDim`), runtime API (`cudaMalloc`, `cudaMemcpy`, `cudaFree`), and authors' philosophy on consulting the official CUDA C Programming Guide. | `2.8_Summary.md` | `8f26808f-6790-401d-9774-4db2b76ae5b3` |
 | 22 | **2026-10-15** | 📖 **PMPP §2.9 — Exercises (Ex 1–5) & Deep Dive on Pointers & Memory** — Vector addition variations (Ex 1–3 with CUDA test code), Grid launch ceiling division calculations (Ex 4), `cudaMalloc` second argument byte requirements (Ex 5), complete C++ `new` vs `malloc` vs `cudaMalloc` trap breakdown (`new int[]` vs `new int()` vs `new 1000`), CPU stack pointer lifecycle (`A_d` stack box, `&A_d` coordinate, `*devPtr = gpu_addr` dereference write-back), printing `A_d` vs `*(&A_d)` vs `*A_d` (CPU segfault vs GPU value), and pointer arithmetic hop size rules. | `2.9_Exercises_Questions.md`, `2.4_Device_global_memory_and_data_transfer.md`, `Characterization_of_C.md`, `exercise_2_adjacent_elements.cu`, `exercise_3_sectioned_elements.cu` | `efe315e3-228f-484d-80f4-8be8e35d7b9d` |
 | 23 | **2026-10-16** | 📖 **PMPP §2.9 — Exercises (Ex 6–10 Completed!) & Deep Dive on Architecture Targeting, PTX JIT & Errors** — `cudaMalloc` first arg (`(void**)&A_d`), `cudaMemcpy` syntax & direction, `cudaError_t` type standards, grid execution configuration math ($N=200,000$, 128 threads/block, 1,563 blocks, 200,064 threads), boundary condition thread predication (`if (i < N)`), summer intern solution via `__host__ __device__`, `#ifdef __CUDA_ARCH__` macro values across GPU families, SFU hardware intrinsics (`__fsqrt_rn`), 3 missing instruction scenarios (`ptxas error`, Error 209 `cudaErrorNoKernelImageForDevice`, software emulation), live verified PTX forward JIT compilation (`compute_75` on RTX 3060) vs backward incompatibility (`compute_90` on RTX 3060), and production tiered architecture guarding pattern. **PMPP Chapter 2 100% COMPLETE!** | `2.9_Exercises_Questions.md`, `memory_note_next_session.md`, `all_cuda_chats_index.md` | `71d4755f-ce52-482d-8188-91e4ab32f174` |
+| 24 | **2026-10-16** | 🛠️ **PMPP Ch.2 — Vector Addition Hands-On Coding & VRAM Profiling Deep-Dive** — Wrote and verified end-to-end vector addition program (`vector_addition_exp1.cu`), verified hardware VRAM allocation rules via `nvidia-smi` and `cudaMemGetInfo` (104 MiB baseline CUDA context, 2 MiB page slab caching allocator, $n=0$ vs $n=1$ vs $n=1,000,000$), compiled with `nvcc`, resolved `g++` vs `nvcc` extension handling (`-x cu`), explained kernel pointer semantics (`C_d[i]` writes to physical VRAM without C++ references), resolved `<device_types.h>` IDE artifact, merged multi-file vector add architectures, fixed nested Git submodule conflict, and pushed complete Chapter 2 code to GitHub. | `vector_addition_exp1.cu`, `vector_addition_cpu.cpp`, `cuda_programs_of_vector_add_in_different_combinaitons/*`, `memory_note_next_session.md`, `all_cuda_chats_index.md` | `21c2277f-ca85-434a-ac84-b1c397e2be5e` |
 ---
 
 ## 📊 Summary
 
 | Metric | Value |
 |--------|-------|
-| **Total chats for this workspace** | **23** |
+| **Total chats for this workspace** | **24** |
 | **Date Range** | 2026-04-23 → 2026-10-16 |
-| **Books covered** | PMPP (Ch.1 & Ch.2 Complete!), CUDA for Engineers (Appendix A, B, C) |
-| **Current progress** | **PMPP Chapter 2 100% COMPLETED (All 10 Exercises Solved & Documented). Next: Chapter 3 (Multidimensional Grids and Data)** |
+| **Books covered** | PMPP (Ch.1 & Ch.2 100% Complete with Code!), CUDA for Engineers (Appendix A, B, C) |
+| **Current progress** | **PMPP Chapter 2 100% COMPLETED (Theory, Exercises, and Code Written & Pushed). Next: Chapter 3 (Multidimensional Grids and Data)** |
 
 
 ---

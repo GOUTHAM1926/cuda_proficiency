@@ -9,7 +9,9 @@
 ## Documentation Style Rules (Strictly Followed)
 
 1. **NO EMOJIS:** Emojis are strictly banned in all documentation, memory notes, and code comments. Keep all text plain and clean.
-2. **Simple and Direct:** Write simply, clearly, and directly, in the user's natural and straightforward tone. No exaggerated hype, no filler.
+2. **Simple and Direct:** Write simply, clearly, and directly, in plain, straightforward technical language. No exaggerated hype, no filler.
+3. **NO PERSONAL PRONOUNS (Impersonal / Objective Technical Style):** Never use personal pronouns such as "we", "I", "me", "our", "us", "you", or "them". This documentation may be open-sourced, so all text must read as an objective, authoritative technical reference (e.g., "In Chapter 2, focus centered on...", "The implementation utilizes...", instead of "In Chapter 2, we worked on...").
+4. **SIMPLE EVERYDAY WORDS (NO FANCY / COMPLEX VOCABULARY):** Use plain, simple, everyday English so that anyone—from a young student to someone outside the field—can understand effortlessly. Avoid fancy, academic words (for example: use "detailed" instead of "comprehensive", "teaching" instead of "pedagogical", "clean" instead of "exhaustive", etc.).
 
 ---
 
@@ -50,7 +52,7 @@
 
 ---
 
-## Where We Go Next: Chapter 3
+## Next Milestone: Chapter 3
 
 - Book Section: PMPP Chapter 3 (Multidimensional Grids and Data)
 - Upcoming Topics:

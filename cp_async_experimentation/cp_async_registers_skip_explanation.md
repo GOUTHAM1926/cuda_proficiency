@@ -90,10 +90,10 @@ once necessarily (the math).
 
 Starting with the **Ampere** architecture — specifically **Compute Capability 8.0 and newer**
 — the SM has a dedicated unit that moves data **independently of the threads' registers**.
-Conceptually you tell the hardware:
+The instruction directs the hardware:
 
-> "Take this chunk of memory from VRAM and place it **directly** into shared memory. Tell me
-> when you're done."
+> "Transfer this chunk of memory from VRAM and place it **directly** into shared memory. Notify
+> upon completion."
 
 **Copy flow with `cp.async`:**
 
@@ -110,14 +110,14 @@ Two distinct benefits:
    When it needs the data, it calls a wait instruction (`cp.async.wait_group` / `wait_all`)
    to confirm the background copy finished.
 
-The math step is unchanged — you still load shared → register → ALU — but now the register is
+The math step is unchanged — the data still loads shared → register → ALU — but now the register is
 used **only when the value is genuinely needed for computation**, not as a copy middleman.
 
 ---
 
 ## 5. The layers: C++ API → PTX → machine instruction
 
-`cp.async` is not a single thing you write; it is a hardware capability exposed at several
+`cp.async` is not a single isolated syntax element; it is a hardware capability exposed at several
 levels. They are **layers of the same mechanism**, not alternatives:
 
 ```
@@ -153,7 +153,7 @@ bits). These are the only legal transfer sizes per instruction.
 
 The size is **how many bytes are moved by one copy instruction**. For example, one float is 4
 bytes, a `float2` (or `double`) is 8 bytes, and a `float4` (or four packed floats) is 16
-bytes. You can copy a contiguous chunk in one shot — e.g. 16 bytes = four floats together.
+bytes. A single copy operation can move a contiguous chunk in one shot — e.g. 16 bytes = four floats together.
 
 ### What "alignment" means
 
@@ -165,7 +165,7 @@ start at an address that is a **multiple of *N***:
 - A **4-byte** copy must start at an address divisible by 4.
 
 Think of memory as a long shelf divided into 16-byte slots. A 16-byte copy must begin exactly
-at the start of a slot — you cannot start in the middle and straddle two slots. Aligned memory
+at the start of a slot — it cannot start in the middle and straddle two slots. Aligned memory
 lets the hardware grab the whole chunk in a single clean transaction.
 
 Two points worth clarifying:
@@ -178,8 +178,8 @@ Two points worth clarifying:
 
 ### Small types (1-byte `char`, 2-byte `half`)
 
-You cannot issue a `cp.async` for a single 1- or 2-byte value — the minimum is 4 bytes. You
-**pack** several small values into a 4/8/16-byte chunk and copy the chunk (e.g. 8 `half`s = 16
+A `cp.async` cannot be issued for a single 1- or 2-byte value — the minimum is 4 bytes. Code
+must **pack** several small values into a 4/8/16-byte chunk and copy the chunk (e.g. 8 `half`s = 16
 bytes → one `LDGSTS.E.BYPASS.128`). A lone small value that cannot be batched falls back to
 the traditional `LDG`+`STS`.
 
@@ -214,8 +214,7 @@ asynchronously). That is what:
 - lets the copy overlap with compute.
 
 **Bypassing L1 is a secondary, optional, size-dependent bonus** — it only happens for 16-byte
-copies, and its purpose is to avoid polluting L1 with staging data. If you only ever
-remembered one sentence:
+copies, and its purpose is to avoid polluting L1 with staging data. The essential takeaway:
 
 > **`cp.async` exists to copy global → shared *without using registers*. Skipping L1 is just
 > an extra perk available at the 16-byte size.**
@@ -327,7 +326,7 @@ No — **bytes** (4/8/16 bytes = 32/64/128 bits).
 It is about the **memory address**. A copy of *N* bytes must begin at an address that is a
 multiple of *N* (e.g. a 16-byte copy starts at an address divisible by 16). It relates to
 moving a **contiguous chunk in one transaction** (yes, "data collectively"), and a datatype
-matters only because it sets how many bytes you move and whether the address is naturally
+matters only because it sets how many bytes are moved and whether the address is naturally
 aligned (a `float4` is naturally 16-byte aligned). The rule itself is about **byte counts and
 addresses**, not the type name.
 

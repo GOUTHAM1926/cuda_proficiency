@@ -84,7 +84,7 @@ Thread reads address A again →
     Maybe evicted (cache miss = go to VRAM again, slow)
 ```
 
-If your working set fits in 2.25 MB → lots of cache hits (fast). If huge → lots of cache misses (slow, goes to VRAM).
+If the working set fits in 2.25 MB → lots of cache hits (fast). If huge → lots of cache misses (slow, goes to VRAM).
 
 ### Why only 2.25 MB? Why not more?
 
@@ -123,14 +123,14 @@ GPU Die:
 128 KB SRAM on each SM
 ┌──────────────────────────────────────────┐
 │   Part 1: SHARED MEMORY                  │
-│   - Programmer-controlled (YOU write code)│
+│   - Programmer-controlled (explicit code)│
 │   - Visible to threads in SAME BLOCK only │
 │   - Max configurable: 100 KB per SM       │
 │   - Default max per block: 48 KB          │
 │──────────────────────────────────────────│
 │   Part 2: L1 CACHE                        │
 │   - Hardware-controlled (automatic)       │
-│   - You write NO code for it              │
+│   - No code needed (automatic)              │
 │   - Hardware decides what to cache         │
 │   - Gets whatever KB is left after shared │
 └──────────────────────────────────────────┘
@@ -153,7 +153,7 @@ SM #0:
 L1 cache is transparent. No thread writes code saying "read from L1 cache." Instead:
 
 ```
-// Your code just reads global memory normally:
+// Code just reads global memory normally:
 float x = global_array[i];
 
 // Behind the scenes, hardware does:
@@ -168,10 +168,10 @@ L1 automatically caches global memory reads for ALL threads on that SM regardles
 
 | | Shared Memory | L1 Cache |
 |---|---|---|
-| **Who controls it?** | Programmer (you write code to use it) | Hardware (automatic, behind the scenes) |
+| **Who controls it?** | Programmer (explicit code) | Hardware (automatic, behind the scenes) |
 | **Who sees it?** | Threads in the SAME BLOCK only | All threads on that SM (transparent) |
-| **You write code?** | Yes, declare `__shared__` arrays | No, happens automatically |
-| **When data lands here** | Only when YOU explicitly copy data | Automatically when you read global memory |
+| **Requires explicit code?** | Yes, declare `__shared__` arrays | No, happens automatically |
+| **When data lands here** | Only when explicitly copied by code | Automatically when reading global memory (hardware manages it) |
 
 ### What does "100 KB shared memory per SM" vs "48 KB per block" mean?
 
@@ -199,15 +199,15 @@ Config 3: 48 KB shared memory  + 80 KB L1 cache  = 128 KB
 Config 4: 0 KB shared memory   + 128 KB L1 cache = 128 KB
 ```
 
-If your kernel uses lots of shared memory, L1 gets smaller. If your kernel uses none, L1 gets the full 128 KB. Yes, if you choose NOT to use shared memory, the hardware just gives you a massive 128 KB L1 cache instead.
+If a kernel uses lots of shared memory, L1 gets smaller. If a kernel uses none, L1 gets the full space. In CUDA, `cudaFuncSetAttribute()` can adjust this split.
 
-### Why do we even use Shared Memory if L1 is automatic? ("Conscious Temporary Storage")
+### Why Use Shared Memory if L1 is Automatic? ("Conscious Temporary Storage")
 
 Since L1 is automatic and fast, why bother writing code for shared memory?
-Because L1 cache is controlled by the hardware — data can be evicted at any moment if the GPU needs space. Shared memory is **"conscious temporary storage"**. It is a scratchpad that YOU control. Data stays there exactly until your block finishes.
+Because L1 cache is controlled by the hardware — data can be evicted at any moment if the GPU needs that space. With Shared Memory, memory allocation is completely deterministic. Data stays resident until the block completes.
 
 **Example of why this matters:**
-Imagine you are multiplying two massive matrices (e.g., 10,000 × 10,000). To calculate just one cell of the output, you need to read 10,000 values from the row of matrix A and 10,000 from the column of matrix B.
+Consider multiplying two massive matrices (e.g., 10,000 × 10,000). To calculate just one cell of the output, an entire row of Matrix A and an entire column of Matrix B must be read.
 If 1024 threads in a block all read from VRAM simultaneously, VRAM chokes.
 Instead, using shared memory:
 
@@ -224,7 +224,7 @@ Shared memory allows threads to **cooperate** on data loads. L1 cache cannot gua
 
 ### Definitions
 
-- **Thread** = smallest unit. One thread executes one copy of your function.
+- **Thread** = smallest unit. One thread executes one instance of the kernel function.
 - **Block** = group of threads (up to 1024). All threads in a block run on the SAME SM and can cooperate via shared memory and `__syncthreads()`.
 - **Grid** = ALL blocks launched for one kernel. 1 kernel = 1 grid. Can have up to 2^31-1 blocks.
 - **SM** = Streaming Multiprocessor. Hardware processing unit. The RTX 3060 GPU has 28 SMs.
@@ -254,9 +254,9 @@ Valid configurations on one SM:
   1 block × 1536 threads                (exceeds 1024 per block!)
 ```
 
-### What about 1 thread per block — can we launch 1024 blocks in an SM?
+### What About 1 Thread per Block — Can 1024 Blocks Launch in an SM?
 
-No. Even with 1-thread blocks, you hit the **max blocks per SM limit of 16**. So with 1-thread blocks, you'd only get 16 blocks on one SM, using only 16 of the 1536 thread slots. That would be extremely wasteful — 1520 thread slots sitting empty.
+No. Even with 1-thread blocks, the **max blocks per SM limit of 16** is reached. So with 1-thread blocks, only 16 blocks fit on one SM, utilizing only 16 of the 1,536 thread slots. That results in extreme underutilization — 1,520 thread slots sitting empty.
 
 ### Where do blocks live?
 
@@ -273,7 +273,7 @@ SM #0                    SM #1                    SM #2
 └──────────────┘        └──────────────┘        └──────────────┘
 ```
 
-The GPU's hardware scheduler decides which SM gets which block. You don't control this.
+The GPU's hardware scheduler decides which SM gets which block. The programmer does not control this.
 
 ### How many blocks per SM?
 
@@ -288,20 +288,20 @@ Multiple limits compete — the TIGHTEST one wins:
 
 ### Grid size (2^31-1) vs SM occupancy (16) — NOT contradictory
 
-It is often noted that we can initialize 2^31-1 blocks, yet max blocks per SM is only 16. Both are correct but mean different things:
+It is often noted that 2^31-1 blocks can be initialized in software, yet max blocks per SM is only 16. Both are correct but mean different things:
 
-- **2^31-1** = the total number of blocks you can launch in ONE kernel (the API's **software grid limit**).
+- **2^31-1** = the total number of blocks launchable in ONE kernel (the API's **software grid limit**).
 - **16** = the hardware limit for how many blocks ONE SM can physically execute at any given moment (the **hardware occupancy limit**).
 
 The GPU acts as a queuing system. For an RTX 3060 with 28 SMs, the **absolute maximum hardware concurrency** is 28 SMs × 16 blocks per SM = **448 blocks** executing simultaneously across the entire GPU (assuming the blocks are small enough to hit this limit).
 
-However, you can instruct the API to launch up to **2,147,483,647 blocks**. The hardware scheduler manages the massive queue automatically.
+However, the API can be instructed to launch up to **2,147,483,647 blocks**. The hardware scheduler manages the massive queue automatically.
 
 **Let's trace an exact example:**
-You write `my_kernel<<<2,000,000, 256>>>()`.
+Consider a kernel launch: `my_kernel<<<2,000,000, 256>>>()`.
 
-1. You are initializing a software grid of 2,000,000 blocks.
-2. Because you chose **256 threads per block**, the "Tightest Limit" rule kicks in. The SM can only handle 1536 threads total.
+1. This initializes a software grid of 2,000,000 blocks.
+2. Because the configuration specifies **256 threads per block**, the "Tightest Limit" rule kicks in. The SM can only handle 1536 threads total.
 3. 1536 / 256 = **6 blocks per SM**.
 4. Across the whole GPU (28 SMs), the hardware can physically hold **168 blocks resident simultaneously** (28 SMs × 6 blocks).
 
@@ -322,7 +322,7 @@ A grid doesn't have to just be a flat line of blocks. It can be a 2D or 3D grid.
 - **2D (X, Y):** Processing an Image (pixels have x, y coordinates) or a Matrix.
 - **3D (X, Y, Z):** Processing a 3D medical MRI scan, or fluid dynamics in a 3D box.
 
-If you don't specify dimensions, Y and Z default to `1`. If you don't have a 3D problem, you just ignore Y and Z.
+If dimensions are omitted, Y and Z default to `1`. For non-3D computations, Y and Z remain `1`.
 
 ### What are the Dimension Limits and Why?
 
@@ -367,7 +367,7 @@ Block 0 (4 threads):
 
 **Critical rule:** `__syncthreads()` ONLY synchronizes threads WITHIN the same block. It does NOT work across different blocks. Block 0 and Block 1 cannot use `__syncthreads()` to coordinate.
 
-### How do you synchronize ACROSS blocks then?
+### How Does Synchronization Occur ACROSS Blocks?
 
 Two options:
 
@@ -429,13 +429,13 @@ Resident (concurrent):    28 × 1536 = 43,008 threads  (loaded, managed, ready)
 Actually executing:       28 × 4 × 32 = 3,584 threads (at any one clock cycle)
 ```
 
-If you launch MORE than 43,008 threads worth of blocks, the extra blocks wait in a hardware queue until running blocks finish.
+If a launch exceeds 43,008 threads worth of blocks, the extra blocks wait in a hardware queue until running blocks finish.
 
 ---
 
 ## Warp Execution: Loop Unrolling and Warp Divergence
 
-To truly understand how GPU hardware optimizes code, we must look at how the compiler and the SM execute instructions across threads. Two of the most critical concepts are **Loop Unrolling** and **Warp Divergence**.
+To truly understand how GPU hardware optimizes code, examining how the compiler and the SM execute instructions is essential.
 
 ### What is Loop Unrolling?
 
@@ -451,7 +451,7 @@ for (int i = 0; i < 4; i++) {
 }
 ```
 
-When you write this, you might think the hardware only executes 4 addition instructions. In reality, **every single time** the loop iterates, the hardware must execute several invisible bookkeeping instructions:
+Writing this loop might suggest the hardware executes only 4 addition instructions. In reality, a traditional loop incurs substantial overhead:
 
 1. **The Math:** `sum += array[i]` (The actual useful work)
 2. **The Counter Update:** `i++` (Add 1 to `i`)
@@ -463,10 +463,10 @@ For a 4-iteration loop, the hardware actually executes **16 instructions** (4 us
 **How the Compiler Fixes This (Unrolling):**
 Because the loop bounds (`i = 0` to `i < 4`) are **constant and explicitly known**, the compiler recognizes this at compile-time. It thinks: *"I know exactly how many times this will run. Why make the hardware jump in circles at runtime?"*
 
-The compiler literally deletes the loop machinery entirely and "unrolls" your code into a straight line, substituting the loop counter `i` with the actual hardcoded values:
+The compiler deletes the loop machinery entirely and "unrolls" the code into a straight line of instructions:
 
 ```cpp
-// How the compiler actually rewrites your code behind the scenes:
+// How the compiler rewrites the code behind the scenes:
 float sum = 0.0f;
 sum += array[0]; // Iteration 0
 sum += array[1]; // Iteration 1
@@ -483,11 +483,11 @@ By removing the `i++` updates, the `< 4` checks, and the `JMP` branches, the exe
 
 ### What is Warp Divergence?
 
-To understand divergence, you must first know what a **Warp** is. On the GPU, threads do not execute independently. The hardware physically groups threads into bundles of 32 called **warps**. All 32 threads in a warp run in **lockstep** — they share a single Program Counter and are forced to execute the *exact same instruction at the exact same time*.
+To understand divergence, understanding the concept of a **Warp** is essential. On the GPU, threads do not execute independently. The hardware physically groups threads into bundles of 32 called **warps**. All 32 threads in a warp run in **lockstep** — they share a single Program Counter and are forced to execute the *exact same instruction at the exact same time*.
 
 **Warp divergence** occurs when the 32 threads in a warp are forced onto different execution paths.
 
-Imagine you write a `while` loop that stops processing when a specific condition is met, and that condition depends on the specific data each thread is handling (a *data-dependent loop*):
+Consider a `while` loop that stops processing when a specific condition is met, where that condition occurs at different times for different data items:
 
 ```cpp
 // A data-dependent loop
@@ -500,26 +500,26 @@ while (data_value != 0) {
 If Thread 0 needs 5 passes through the loop, but Thread 1 only needs 1 pass, what does the hardware do?
 Since they are bound together in the same warp, they *cannot* separate. The hardware **serializes** the execution. It forces the warp to keep looping until the *slowest* thread (Thread 0) is completely finished. During passes 2, 3, 4, and 5, Thread 1 is "masked off" — it just sits idle, wasting clock cycles.
 
-This is warp divergence: 32 threads that should have worked perfectly in parallel end up taking turns or waiting on each other, drastically reducing your hardware efficiency.
+This is warp divergence: 32 threads that should have worked in parallel end up taking turns or waiting on each other, drastically reducing hardware efficiency.
 
 ### The Connection (The Link)
 
-The relationship between these two concepts is fundamental: **You cannot have one without the other.**
+The relationship between these two concepts is fundamental: **One directly influences the other.**
 
-1. **If you have Warp Divergence, Loop Unrolling is Impossible:**
-If you write a loop whose pass count depends on thread-specific data, the compiler *cannot* unroll it at compile-time because it doesn't know how many times it needs to repeat the code. Because the loop bounds are variable, the hardware must evaluate them at runtime, leading directly to warp divergence.
+1. **If Warp Divergence Occurs, Loop Unrolling is Impossible:**
+If a loop has a pass count that depends on thread-specific data, the compiler *cannot* unroll it.
 
-2. **If you fix the bounds, you kill Divergence and unlock Unrolling:**
-By designing your algorithms to use fixed, constant loop bounds, you guarantee that every single thread in the warp runs the loop the exact same number of times. This completely eliminates warp divergence (no thread ever waits for another). Because the loop is fixed, the compiler gains the mathematical certainty it needs to flatten your code into hyper-fast, unrolled instructions.
+2. **Fixing the bounds eliminates Divergence and unlocks Unrolling:**
+Designing algorithms with fixed, constant loop bounds guarantees that every single thread in a warp takes the exact same execution path. This eliminates warp divergence completely and allows the compiler to unroll loops.
 
-In short: **Constant loop bounds are the key.** They keep your warps synchronized (killing divergence) while simultaneously allowing the compiler to rip out the overhead (enabling loop unrolling).
+In short: **Constant loop bounds are the key.** Constant bounds keep warps synchronized (eliminating divergence) while simultaneously allowing the compiler to remove overhead (enabling loop unrolling).
 
 **Let's Look at a Direct Example Connecting Both:**
 
 *(For a deeper mathematical dive into this specific problem, see Section **"4. Mathematical Proofs & Loop Edge-Cases"** in `data_accessing_techniques.md`).*
 
 **The Context (The Problem):**
-Imagine we have a 3D tensor of shape `[2, 3, 4]`. We want to convert a flat 1D `linear_idx` (like 14 or 2) into 3D coordinates `(depth, row, col)`. To do this, we repeatedly divide by the dimension size and take the remainder.
+Consider a 3D tensor of shape `[2, 3, 4]`. The objective is to convert a flat 1D `linear_idx` (like 14) back into 3D coordinates `(z, y, x)`.
 
 There are two ways to write the loop that does this:
 
@@ -533,13 +533,13 @@ while (linear_idx != 0) {
 }
 ```
 
-- **Why it seems logical at first:** If our `linear_idx` becomes 0 after peeling off the innermost dimensions, why keep doing math? It seems faster to just stop early.
+- **Why it seems logical at first:** If `linear_idx` becomes 0 after peeling off the innermost dimensions, why keep doing math? It seems faster to just stop early.
 
 - **The Reality:**
   - **Thread A** is given `linear_idx = 14`. It takes **3 passes** for the number to reach 0.
   - **Thread B** is given `linear_idx = 2`. It takes **1 pass** for the number to reach 0.
 - **The Result on Divergence:** Because Thread B finishes in 1 pass while Thread A takes 3, Thread B is forced to sit completely idle (wasting cycles) while Thread A finishes passes 2 and 3. The warp has **diverged**.
-- **The Result on Unrolling:** The compiler looks at this code and says, "I don't know how many times this loop will run—it depends entirely on what `linear_idx` the thread is given at runtime." Therefore, it **cannot** unroll the code. All loop bookkeeping overhead remains.
+- **The Result on Unrolling:** The compiler cannot determine how many times this loop will run for any given thread — Thread A might run 3 times, Thread B might run 1 time. Because the termination condition is dynamic, **the compiler cannot unroll this loop.**
 
 **2. The "Good" Way (Stopping when all dimensions are completed):**
 
@@ -552,18 +552,18 @@ for (int d = dims - 1; d >= 0; d--) {
 }
 ```
 
-- **Why it is mathematically correct:** Even if `linear_idx` reaches 0 early (like for Thread B), we *must* continue the loop to ensure the outermost dimensions explicitly get set to `0` (e.g., coordinate `[0, 0, 2]`). If we stop early, those outer coordinates are left uninitialized (garbage memory)!
+- **Why it is mathematically correct:** Even if `linear_idx` reaches 0 early (like for Thread B), the loop must continue to ensure outermost dimensions explicitly evaluate to `0` (e.g., coordinate `[0, 0, 2]`). Terminating early leaves those outer coordinates uninitialized (garbage memory).
 
 - **The Result on Divergence:** Because `dims` is always 3 for a 3D tensor, **Thread A** and **Thread B** both run the loop exactly **3 times**, regardless of what their `linear_idx` is. Both threads execute in perfect lockstep. No one finishes early, no one waits. Warp divergence is **completely killed**.
 - **The Result on Unrolling:** The compiler looks at this code and says, "Ah, this loop always runs exactly 3 times for every single thread, guaranteed." It safely deletes the `for` loop machinery and writes the math instructions out 3 times in a straight line (unrolling it).
 
-This is the link: **by forcing the loop to run for all dimensions instead of stopping at 0, we ensure mathematical correctness, kill warp divergence, and unlock loop unrolling all at the same time.**
+This is the link: **forcing the loop to run for all dimensions instead of stopping at 0 ensures mathematical correctness, eliminates warp divergence, and unlocks loop unrolling simultaneously.**
 
 ---
 
 ## Tensor Cores vs CUDA Cores for Matmul
 
-A common question arises: if we have 128 CUDA cores but only 4 tensor cores per SM, aren't 4 tensor cores too little for huge matrix multiplications?
+A common question arises: with 128 CUDA cores but only 4 tensor cores per SM, are 4 tensor cores a downgrade? No — tensor cores are massive matrix engines.
 
 **A tensor core is NOT like a CUDA core.** Don't think of "4 tensor cores" as "4 tiny things."
 
@@ -725,14 +725,14 @@ nvcc --maxrregcount=32 my_kernel.cu -o my_kernel
 
 Registers are actually allocated by the hardware in **warp granularity** (groups of 32 threads), not individually per thread. The hardware rounds UP.
 
-If your code says each thread uses 255 registers:
+If the compiled code requires each thread to use 255 registers:
 
 1. 255 registers/thread × 32 threads/warp = 8,160 registers per warp.
 2. The SM has 65,536 total registers.
 3. 65,536 ÷ 8,160 = 8.03 → **Only 8 warps can fit.**
 4. 8 warps × 32 threads = **256 threads maximum on the SM.**
 
-How those 256 threads are divided into blocks is up to you. You could launch 1 block of 256 threads, or 4 blocks of 64 threads. The result is the same: the SM register pool is completely full, and occupancy is trapped at 256 active threads.
+How those 256 threads are divided into blocks is configurable: 1 block of 256 threads, or 2 blocks of 128 threads.
 
 **Is 255 registers per thread a lot of storage?**
 255 registers × 4 bytes = 1,020 bytes (≈ 1 KiB) per thread.
@@ -744,7 +744,7 @@ The **compiler** decides how many registers each thread needs at compile time. T
 
 ```
 Compile time:
-  nvcc analyzes your kernel → decides: "each thread needs 32 registers"
+  nvcc analyzes the kernel → determines: "each thread needs 32 registers"
 
 Runtime (block is assigned to SM #5):
   Block 0 has 256 threads
@@ -812,14 +812,14 @@ Total warps on the SM = 8 warps.
 4. The SM remains 100% busy doing Block B's work while Block A waits for memory. This is the essence of **Latency Hiding**.
 
 **Scenario 2: Why 1 Block per SM is Dangerous**
-Imagine your kernel uses so much Shared Memory that only **1 block** fits on the SM.
+Consider a kernel using so much Shared Memory that only **1 block** fits on the SM.
 
 1. The SM holds 1 block (Block A) with 256 threads (8 warps).
 2. Clock cycle 10: The block hits a `__syncthreads()` barrier. All 8 warps halt to wait for memory.
 3. Clock cycle 11: The 4 warp schedulers look for ready warps. There are NO other blocks. All warps in Block A are stalled.
 4. The schedulers have literally nothing to do. The SM **sits completely idle**, wasting compute cycles until the memory arrives.
 
-This is exactly why you want multiple blocks per SM (the sweetspot is 2-4), so the warp schedulers always have independent warps to switch to when one block stalls.
+This is why multiple blocks per SM are desirable (the sweet spot is 2 to 4), ensuring warp schedulers have alternative active warps when others stall.
 
 ---
 
@@ -827,16 +827,16 @@ This is exactly why you want multiple blocks per SM (the sweetspot is 2-4), so t
 
 **What exactly is Occupancy?**
 Occupancy is a percentage metric. It is simply: `(Active Threads running on the SM) / (Maximum Threads the SM supports)`.
-For the RTX 3060, the max threads per SM is 1,536. If your configuration allows 1,024 threads to fit on the SM, your occupancy is `1024 / 1536 = 67%`. It is literally a measure of how "full" the SM's thread capacity is.
+For the RTX 3060, the max threads per SM is 1,536. If a configuration allows 1,024 threads to fit on the SM, occupancy is `1024 / 1536 = 67%`. Occupancy measures how fully the SM's thread capacity is utilized.
 
-To find out exactly how many blocks will fit on an SM (and thus calculate your **Occupancy**), you must calculate all four hardware limits. The lowest number (the **TIGHTEST limit**) always wins.
+To determine how many blocks fit on an SM (and calculate **Occupancy**), evaluation against all 4 hardware limits is required:
 
 **The Hardware Limits (RTX 3060, Compute Capability 8.6):**
 
 1. **Block Limit:** Max 16 blocks per SM
 2. **Thread Limit:** Max 1,536 threads per SM
 3. **Shared Memory Limit:** Max 100 KB (102,400 bytes) per SM
-4. **Register Limit:** Max 65,536 registers per SM (allocated in warps, but for simplicity we'll calculate directly per thread)
+4. **Register Limit:** Max 65,536 registers per SM (allocated in warps, calculated directly per thread here for illustration)
 
 *Occupancy = (Active Threads per SM) / 1536*
 
@@ -945,7 +945,7 @@ Kernel config: 1 thread/block, 0 KB shared mem, 16 registers/thread
 - Shared Limit: unlimited
 - Register Limit: 65,536 / 16 = 4096 blocks
 → TIGHTEST = 16 blocks
-→ Occupancy: 16 blocks × 1 thread = 16 threads = 1% (You are using 1% of the SM's power)
+→ Occupancy: 16 blocks × 1 thread = 16 threads = 1% (Utilizing only 1% of the SM's thread capacity)
 ```
 
 ### Case 10: "Just Over" The Limit (The Cliff)
@@ -959,14 +959,14 @@ Kernel config: 256 threads/block, 17 KB shared mem, 32 registers/thread
 → TIGHTEST = 5 blocks
 → Occupancy: 5 blocks × 256 = 1280 threads = 83%
 
-*Notice: Just 1 extra KB of shared memory (from 16KB to 17KB) drops your occupancy from 100% (6 blocks) to 83% (5 blocks) because 6 × 17 = 102 KB, which exceeds the 100 KB limit!*
+*Notice: Just 1 extra KB of shared memory (from 16KB to 17KB) drops occupancy from 100% (6 blocks) to 83% (5 blocks) because 6 × 17 = 102 KB, which exceeds the 100 KB limit!*
 ```
 
 ---
 
 ## Occupancy vs Metric Tradeoff Sweetspots
 
-Now that you understand the 4 limits that bottleneck occupancy, here is how you should think about targeting "Sweetspots" when designing kernels.
+With the 4 occupancy limits established, kernel tuning follows these practical guidelines:
 
 ### 1. The Register / Occupancy Tradeoff
 
@@ -982,8 +982,8 @@ As register usage goes up, occupancy drops. Here is exactly how it affects laten
 | **255** | 256 (8 warps) | 8 | **17%** | **Worst case** (Crippled latency hiding) |
 
 **Wait, is 17% Occupancy always bad? (The Compute-Bound Exception)**
-No! 17% occupancy is only a disaster if your kernel is **Memory Bound** (waiting on VRAM often).
-If your kernel is highly **Compute Bound** (like a massive Matrix Multiplication / GEMM), memory latency hiding isn't your main problem. Your problem is keeping data as close to the ALUs as possible to maximize **Instruction-Level Parallelism (ILP)**.
+No. 17% occupancy is only problematic if a kernel is **Memory Bound** (waiting on VRAM often).
+If a kernel is highly **Compute Bound** (like a massive Matrix Multiplication / GEMM), memory latency hiding is not the primary bottleneck. The objective is keeping data as close to the ALUs as possible to maximize **Instruction-Level Parallelism (ILP)**.
 In highly optimized libraries like **cuBLAS** or **CUTLASS**, programmers use a technique called **Register Tiling**. They intentionally use all 255 registers per thread to cache huge chunks of matrix data locally, avoiding slow VRAM entirely. This forces occupancy down to 17-33%, but because the SM is busy crunching math entirely inside registers, it doesn't need to hide memory latency. In these cases, low occupancy is actually the *optimal* performance configuration.
 
 ### 2. The Threads per Block Sweetspot
@@ -993,16 +993,16 @@ In highly optimized libraries like **cuBLAS** or **CUTLASS**, programmers use a 
 
 Why?
 
-- If you use **32 threads/block**: You need 48 blocks to reach 100% occupancy. But the hard limit is 16 blocks per SM! You will max out at 33% occupancy (16 × 32 = 512 threads).
-- If you use **1024 threads/block**: A single block uses 1024 threads out of the 1536 limit. The SM cannot fit a second block (1024 + 1024 = 2048). So your occupancy is capped at 67% (1024/1536), and if that massive block hits a `__syncthreads()`, the entire SM halts.
+- With **32 threads/block**: 48 blocks are required to reach 100% occupancy. But the hard limit is 16 blocks! 16 × 32 = 512 threads = **33% max occupancy**.
+- With **1024 threads/block**: A single block consumes 1024 threads out of the 1536 limit. The SM cannot fit a second block (1024 + 1024 = 2048 > 1536). Result: **67% max occupancy**, leaving 512 thread slots unallocated.
 
 128 or 256 threads per block gives the SM scheduler the perfect flexibility to pack blocks in without hitting the 16-block ceiling or the 1536-thread ceiling prematurely.
 
 ### 3. The Blocks per SM Sweetspot
 
-- **The Sweetspot:** You generally want **at least 2 to 4 active blocks per SM**.
+- **The Optimal Target:** Generally, **at least 2 to 4 active blocks per SM** are desirable.
 
-Why? If you design a kernel that results in only **1 block per SM** (e.g., due to high shared memory usage), you lose a major hardware advantage: concurrent block execution. If that single block hits a `__syncthreads()` barrier, every single thread in the SM stops. The warp schedulers have literally nothing else to do while they wait. If you have 3 blocks on the SM, and Block 0 hits a barrier, the SM instantly switches to executing instructions from Block 1 and Block 2, keeping the CUDA cores 100% utilized.
+Why? Designing a kernel that results in only **1 block per SM** (e.g., due to excessive shared memory or 1024 threads/block) causes any `__syncthreads()` barrier to stall the entire SM.
 
 ---
 
@@ -1036,13 +1036,13 @@ Why? If you design a kernel that results in only **1 block per SM** (e.g., due t
 
 ---
 
-## How to Find These Specifications on Your Own System
+## How to Query These Specifications on a System
 
 A common question is: what are the commands to find L2 cache, L1 cache, shared memory sizes on a GPU?
 
 **For VRAM:** `nvidia-smi` is enough — it shows total GPU memory (the full physical 12,288 MiB).
 
-**For L2 cache, shared memory, thread limits, and everything else:** There's no simple `nvidia-smi` command. You need to write a CUDA program using `cudaGetDeviceProperties()`. That's what [`device_query.cu`](device_query/device_query.cu) does. The key fields are:
+**For L2 cache, shared memory, thread limits, and everything else:** There is no simple `nvidia-smi` command. Querying requires a CUDA program using `cudaGetDeviceProperties()`, as implemented in [`device_query.cu`](device_query/device_query.cu). The key fields are:
 
 ```c
 cudaDeviceProp prop;
@@ -1067,7 +1067,7 @@ prop.maxThreadsDim[1]             // Max block dim y (1024)
 prop.maxThreadsDim[2]             // Max block dim z (64)
 ```
 
-**For L1 cache size:** There is no direct `cudaGetDeviceProperties` field for L1 cache size. L1 shares the 128 KB SRAM with shared memory, so L1 size = 128 KB minus however much shared memory your kernel uses. You know the total SRAM (128 KB for Ampere) from the architecture documentation.
+**For L1 cache size:** There is no direct `cudaGetDeviceProperties` field for L1 cache size. L1 shares the 128 KB SRAM with shared memory, so L1 size = 128 KB minus however much shared memory the kernel uses. Total SRAM capacity (128 KB for Ampere) is documented in architecture specifications.
 
 Compile and run (from the `device_query/` folder): `nvcc device_query.cu -o device_query && ./device_query` (Source: [`device_query.cu`](device_query/device_query.cu))
 
@@ -1075,9 +1075,9 @@ Compile and run (from the `device_query/` folder): `nvcc device_query.cu -o devi
 
 ## Do these limits change per Architecture?
 
-**Yes.** The limits we have discussed (1536 threads per SM, 16 blocks per SM) are specific to the RTX 3060 (Compute Capability 8.6). Different GPUs have different hardware designs.
+**Yes.** The limits discussed (1536 threads per SM, 16 blocks per SM) are specific to the RTX 3060 (Compute Capability 8.6). Different GPUs have different hardware designs.
 
-When you move code from an old GPU to a new GPU, it will still run because the CUDA compiler handles the translation. However, **the optimal occupancy sweet spots change.**
+When moving code from an older GPU to a newer GPU, execution continues seamlessly because the CUDA compiler handles binary and PTX translation. However, **the optimal occupancy sweet spots change.**
 
 Here is a detailed history of what changed (and what stayed the same) across NVIDIA architectures:
 
@@ -1101,6 +1101,7 @@ Here is a detailed history of what changed (and what stayed the same) across NVI
 | **Ampere (Consumer)** | 8.6 | 1536 | 16 | 65,536 (256 KB) | 100 KB | **RTX 3060**, RTX 3090 |
 | **Ada Lovelace** | 8.9 | 1536 | **24** | 65,536 (256 KB) | 100 KB | RTX 4090 |
 | **Hopper** | 9.0 | 2048 | 32 | 65,536 (256 KB) | **227 KB** | H100 |
+| **Blackwell** | 10.0 | 2048 | 32 | 65,536 (256 KB) | **228 KB** | B200, GB200 |
 
 *Notice the wild shifts?*
 
@@ -1109,6 +1110,408 @@ Here is a detailed history of what changed (and what stayed the same) across NVI
 - Shared memory capacity keeps growing drastically (48 KB up to 227 KB) to support heavier deep learning workloads.
 
 To verify limits for a specific GPU in the future without relying on documentation, run `cudaGetDeviceProperties()` as demonstrated in [`device_query.cu`](device_query/device_query.cu).
+
+---
+
+## Kernel Launch & Hardware Execution: How Blocks Map to SMs
+
+A fundamental question in CUDA execution is: **When a kernel launches, does it execute on a single Streaming Multiprocessor (SM), or across all SMs on the GPU?**
+
+The short answer: **A kernel launch executes across ALL available SMs on the chip.**
+
+The GPU hardware scheduler actively balances and distributes the requested thread blocks across all SMs.
+
+### The Three Invariant Rules of Block-to-SM Mapping
+
+```
+                                 Kernel Launch (Grid)
+                                      1400 Blocks
+                                           │
+                        GPU Hardware GigaThread Scheduler
+                                           │
+             ┌──────────────┬──────────────┼──────────────┬──────────────┐
+             ▼              ▼              ▼              ▼              ▼
+           SM 0           SM 1           SM 2           ...            SM 27
+        (50 Blocks)    (50 Blocks)    (50 Blocks)                   (50 Blocks)
+```
+
+1. **Rule 1: A single block is never split across multiple SMs.**
+   All threads within Block 0 execute together on the same physical SM. A block cannot be split so that half its threads run on SM 0 and half run on SM 1.
+   - *Hardware Reason:* Threads within a block rely on hardware barrier synchronization (`__syncthreads()`) and shared on-chip memory (`__shared__`). The physical SRAM for shared memory and the hardware barrier synchronization units reside locally inside each individual SM. Splitting a block across two SMs would require cross-chip synchronization and remote SRAM routing, breaking hardware latency guarantees.
+
+2. **Rule 2: A single SM can host multiple blocks concurrently and sequentially.**
+   An SM is not restricted to executing one block at a time. If an SM has sufficient hardware resources (registers, shared memory, and warp slots), multiple blocks can reside on that SM simultaneously.
+   - *Example on RTX 3060 (Ampere CC 8.6):* Up to 16 blocks can reside on a single SM simultaneously, provided the combined thread count does not exceed 1,536 threads and register/shared memory limits are respected.
+
+3. **Rule 3: A Grid distributes its constituent blocks across all available SMs.**
+   When a kernel launches with hundreds or thousands of blocks, the GPU's hardware block scheduler (the GigaThread Engine) distributes those blocks across all available SMs to maximize hardware utilization.
+
+---
+
+### Concrete Walkthrough on the NVIDIA GeForce RTX 3060 (28 SMs)
+
+The physical RTX 3060 chip contains **28 SMs**. How blocks distribute depends directly on the launch configuration:
+
+#### Scenario A: Undersubscribed Launch (15 Blocks)
+Suppose a kernel launches with 15 blocks (e.g., `vecAddKernel<<<15, 256>>>`):
+- The hardware block scheduler assigns **1 block to each of 15 SMs**.
+- The remaining **13 SMs sit completely idle** with zero work.
+- The GPU does **not** dump all 15 blocks onto a single SM. The scheduler always prioritizes distributing blocks across distinct SMs to maximize memory bandwidth and execution unit availability.
+- *Implication:* Launching fewer blocks than the number of physical SMs leaves hardware underutilized.
+
+#### Scenario B: Balanced Launch (56 Blocks)
+Suppose a kernel launches with 56 blocks:
+- The scheduler assigns 2 blocks to each of the 28 SMs ($56 / 28 = 2$).
+- If register and shared memory footprints permit, both blocks run concurrently on each SM. If resources are constrained, the SM executes the blocks in sequential waves.
+
+#### Scenario C: Large-Scale Launch (1,400 Blocks)
+Suppose a kernel launches with 1,400 blocks:
+- The scheduler assigns approximately 50 blocks to each SM over time ($1,400 / 28 = 50$).
+- Each SM runs resident blocks concurrently. As resident blocks finish, the SM continuously pulls waiting blocks from the grid queue until all 1,400 blocks complete.
+
+---
+
+### Common Architectural Questions on Block Execution
+
+#### Can the programmer manually pin blocks to specific SMs?
+**No.** In standard CUDA, the programmer cannot specify that Block 0 must run on SM 0 or force all blocks onto a single SM. 
+
+The hardware scheduler retains exclusive authority over block placement. This design ensures **transparent scalability**: the identical compiled binary can execute on an entry-level GPU with 2 SMs or a high-end data center accelerator with 144 SMs without modifying source code or recompiling.
+
+#### In the classic CUDA model, can two blocks on the same SM share resources?
+**No.** In the classic CUDA programming model (all architectures prior to Hopper):
+- **Shared memory is strictly block-private:** Even if Block 0 and Block 1 are resident on the exact same SM at the same time, Block 0 cannot access Block 1's shared memory. Each block receives a distinct, isolated hardware slice of SRAM.
+- **Synchronization is strictly block-private:** `__syncthreads()` synchronizes only the threads belonging to that specific block. It cannot synchronize threads across different blocks.
+- **Inter-block communication requirement:** If threads must communicate, exchange data, or synchronize, those threads **must belong to the same block** (limited to 1,024 threads).
+
+---
+
+## The Evolution of the CUDA Hierarchy: From Isolated Blocks to Thread Block Clusters
+
+Historically, the inability of different thread blocks to communicate directly created a fundamental performance barrier for workloads requiring large-scale data sharing, such as matrix multiplication (GEMM) and Large Language Model (LLM) attention mechanisms.
+
+To understand how modern architectures solve this, the historical evolution of the CUDA execution hierarchy is detailed below.
+
+### 1. The Classic 3-Level Hierarchy (Fermi through Ada Lovelace: CC 2.0 – 8.9)
+
+From the inception of CUDA through Ampere (RTX 3060, A100) and Ada Lovelace (RTX 4090), the execution hierarchy consisted strictly of three tiers:
+
+$$\text{Grid} \longrightarrow \text{Block} \longrightarrow \text{Thread}$$
+
+```
+Classic Execution Hierarchy:
+┌────────────────────────────────────────────────────────┐
+│ Grid                                                   │
+│  ┌──────────────────────┐    ┌──────────────────────┐  │
+│  │ Block 0              │    │ Block 1              │  │
+│  │  [Private Shared Mem]│    │  [Private Shared Mem]│  │
+│  │  Thread 0..Thread N  │    │  Thread 0..Thread N  │  │
+│  └──────────────────────┘    └──────────────────────┘  │
+│          ▲                              ▲              │
+│          └───────────[ Isolated ]───────┘              │
+└────────────────────────────────────────────────────────┘
+```
+
+- **Characteristics:**
+  - Blocks are completely isolated units of execution.
+  - No hardware mechanism exists to synchronize distinct blocks during kernel execution.
+  - To exchange data between Block 0 and Block 1, threads had to write data out to **Global Memory (VRAM)**, finish the kernel, and launch a subsequent kernel, incurring hundreds of cycles of memory latency and kernel launch overhead.
+
+---
+
+### 2. The 4-Level Hierarchy Breakthrough: Thread Block Clusters (Hopper & Blackwell: CC 9.0 – 10.x)
+
+Beginning with the **Hopper architecture (H100, Compute Capability 9.0)** and expanded in the **Blackwell architecture (B200 / GB200, Compute Capability 10.0)**, NVIDIA introduced a fourth tier between the Grid and the Block:
+
+$$\text{Grid} \longrightarrow \mathbf{\text{Thread Block Cluster}} \longrightarrow \text{Block} \longrightarrow \text{Thread}$$
+
+```
+Cluster Execution Hierarchy (Hopper & Blackwell):
+┌────────────────────────────────────────────────────────────────────────────┐
+│ Grid                                                                       │
+│  ┌──────────────────────── Thread Block Cluster ────────────────────────┐  │
+│  │  ┌──────────────────────┐            ┌──────────────────────┐        │  │
+│  │  │ Block 0              │  SM-to-SM  │ Block 1              │        │  │
+│  │  │  [Shared Memory]     │◄──Direct──►│  [Shared Memory]     │        │  │
+│  │  │  Thread 0..Thread N  │  Network   │  Thread 0..Thread N  │        │  │
+│  │  └──────────────────────┘            └──────────────────────┘        │  │
+│  │         ▲                                   ▲                        │  │
+│  │         └────────── cluster.sync() ─────────┘                        │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Key Capabilities of Thread Block Clusters:
+
+1. **Guaranteed Co-Scheduling:**
+   A cluster groups up to 8 or 16 thread blocks. The hardware scheduler guarantees that all blocks within a cluster are scheduled simultaneously on physically adjacent SMs within the same Processing Cluster (GPC / TPC).
+
+2. **Distributed Shared Memory (DSMEM):**
+   Threads in Block 0 can directly load from or store to the shared memory allocated by Block 1.
+   - Data transfers occur across a dedicated high-bandwidth, low-latency SM-to-SM hardware interconnect.
+   - This bypasses global VRAM entirely, reducing latency from ~200–400 cycles (VRAM) down to ~20–30 cycles (DSMEM).
+
+3. **Cluster-Wide Hardware Barrier Synchronization:**
+   The CUDA runtime provides `cluster.sync()`, allowing all threads across all blocks inside a cluster to synchronize at hardware speed.
+
+4. **Blackwell Enhancements (Compute Capability 10.0):**
+   - **2nd Generation Distributed Shared Memory:** Higher interconnect bandwidth between SM pairs.
+   - **Tensor Memory Accelerator (TMA) Multicast:** Hardware-driven asynchronous data transfers from global memory directly into the distributed shared memory of multiple blocks simultaneously, without consuming SM register or ALU cycles.
+
+---
+
+### Architectural Generation Matrix: Block Independence vs Clustering
+
+| Architecture | Generation | Compute Capability | Execution Hierarchy | Inter-Block SM Communication | Hardware Synchronization Scope | Target Domain |
+|---|---|:---:|---|---|---|---|
+| **Fermi** | 2010 | 2.0 | `Grid -> Block -> Thread` | None (VRAM only) | Block only (`__syncthreads`) | General GPU Computing |
+| **Kepler** | 2012 | 3.x | `Grid -> Block -> Thread` | None (VRAM only) | Block only (`__syncthreads`) | High Performance Computing |
+| **Maxwell** | 2014 | 5.x | `Grid -> Block -> Thread` | None (VRAM only) | Block only (`__syncthreads`) | Energy Efficient Graphics/Compute |
+| **Pascal** | 2016 | 6.x | `Grid -> Block -> Thread` | None (VRAM only) | Block only (`__syncthreads`) | Deep Learning Inception |
+| **Volta** | 2017 | 7.0 | `Grid -> Block -> Thread` | None (VRAM only) | Block + Warp (`__syncwarp`) | Tensor Cores Introduced |
+| **Turing** | 2018 | 7.5 | `Grid -> Block -> Thread` | None (VRAM only) | Block + Warp | Ray Tracing / Consumer DL |
+| **Ampere** | 2020 | 8.0 (A100)<br>8.6 (**RTX 3060**) | `Grid -> Block -> Thread` | None (VRAM only) | Block + Warp | Asynchronous Copy (`cp.async`) |
+| **Ada Lovelace**| 2022 | 8.9 (RTX 4090) | `Grid -> Block -> Thread` | None (VRAM only) | Block + Warp | Massive L2 Cache Jump |
+| **Hopper** | 2022 | 9.0 (H100) | `Grid -> Cluster -> Block -> Thread` | **DSMEM** (SM-to-SM Interconnect) | Cluster (`cluster.sync`) + Block + Warp | Transformer Engine, 4th Gen Tensor Cores |
+| **Blackwell** | 2024 | 10.0 (B200, GB200) | `Grid -> Cluster -> Block -> Thread` | **Enhanced DSMEM** + TMA Multicast | Cluster (`cluster.sync`) + Block + Warp | FP4 Tensor Cores, Multi-Die Superchips |
+
+```
+Key Architectural Takeaway:
+On consumer Ampere hardware (such as the RTX 3060), thread blocks operate under the classic 3-level model:
+- Each block executes independently.
+- Blocks are distributed across the 28 SMs by the hardware scheduler.
+- Shared memory and barrier synchronization remain strictly private to each individual block.
+- Communication across blocks requires global memory writes and kernel termination or global atomic operations.
+```
+
+---
+
+### Deep Dive: Shared Memory Access Boundaries — Intra-SM vs Inter-SM
+
+A common point of confusion is whether shared memory isolation depends on physical location (same SM vs different SMs) or architectural grouping (classic blocks vs clusters).
+
+#### 1. The Classic Rule (Ampere / RTX 3060 and Earlier)
+In all architectures prior to Compute Capability 9.0 (including the RTX 3060):
+- **Across different SMs:** Shared memory is completely isolated.
+- **Inside the same SM:** Shared memory is completely isolated.
+
+Physical location does not alter isolation. Even when the hardware scheduler places Block 0 and Block 1 onto the identical physical SM at the same moment, the hardware enforces strict memory segregation. Block 0 cannot address, load, or store into the SRAM allocated to Block 1.
+
+#### 2. The Modern Rule (Hopper & Blackwell: Compute Capability >= 9.0)
+In architectures supporting Thread Block Clusters, isolation is governed exclusively by **Cluster Membership**, not by physical SM placement:
+
+- **Case 1: Blocks in the SAME Cluster on DIFFERENT SMs (Inter-SM Access)**  
+  Block 0 resides on SM 0, and Block 1 resides on SM 1.  
+  Because both blocks belong to the same cluster, a thread in Block 0 can read or write Block 1's shared memory. The hardware routes this transaction across the dedicated on-chip **SM-to-SM high-speed interconnect**.
+
+- **Case 2: Blocks in the SAME Cluster on the SAME SM (Intra-SM Access)**  
+  If the hardware scheduler places Block 0 and Block 1 of the same cluster onto the identical physical SM (SM 0), cross-block shared memory access remains fully supported. In this case, the transaction routes locally through the SM's internal SRAM crossbar without traversing the inter-SM bus.
+
+- **Case 3: Blocks in DIFFERENT Clusters (Regardless of SM Placement)**  
+  If Block A and Block B belong to different clusters, neither can access the other's shared memory, regardless of whether they execute on different SMs or the same SM.
+
+```
+Access Authorization Decision Flow:
+                    Are the two blocks in the SAME cluster?
+                                       │
+                      ┌────────────────┴────────────────┐
+                      ▼                                 ▼
+                     YES                                NO
+                      │                                 │
+           Can access each other's           CANNOT access each other's
+               Shared Memory                     Shared Memory
+         (Both Intra-SM and Inter-SM)             (100% Isolated)
+```
+
+#### Shared Memory Cross-Access Matrix
+
+| Hardware Architecture | Cluster Membership | Execution Location | Cross-Block Shared Memory Access? | Routing Path |
+|---|---|---|:---:|---|
+| **Classic (Ampere / RTX 3060)** | N/A (No clusters) | Different SMs | **No** | Block-isolated |
+| **Classic (Ampere / RTX 3060)** | N/A (No clusters) | Same SM | **No** | Block-isolated |
+| **Hopper / Blackwell (CC >= 9.0)** | Different Clusters | Different SMs | **No** | Cluster-isolated |
+| **Hopper / Blackwell (CC >= 9.0)** | Different Clusters | Same SM | **No** | Cluster-isolated |
+| **Hopper / Blackwell (CC >= 9.0)** | **Same Cluster** | **Different SMs** | **Yes** | SM-to-SM Interconnect |
+| **Hopper / Blackwell (CC >= 9.0)** | **Same Cluster** | **Same SM** | **Yes** | Internal SM SRAM Crossbar |
+
+---
+
+## Blackwell Architecture: Data Center (B200 / GB200) vs Consumer (GeForce RTX 50 Series)
+
+A major point of inquiry is whether modern architectural additions like **Thread Block Clusters**, **Distributed Shared Memory (DSMEM)**, and the **Tensor Memory Accelerator (TMA)** exist only on data-center systems or whether they also run on consumer-grade GeForce RTX 50-series GPUs.
+
+### 1. Consumer Blackwell (`sm_120`) Supports Clusters and TMA
+
+* **Compute Capability 12.0 (`sm_120`):** The GeForce RTX 50 series (RTX 5090, RTX 5080, RTX 5070) belongs to Compute Capability 12.0.
+* **Thread Block Clusters:** Supported in hardware. As documented in the official NVIDIA CUDA C++ Programming Guide, Thread Block Clusters require Compute Capability 9.0 or higher. Because 12.0 is greater than 9.0, consumer Blackwell includes hardware support for clusters and Distributed Shared Memory.
+* **Tensor Memory Accelerator (TMA):** Basic asynchronous tensor copies are supported, but advanced datacenter TMA pipelines that rely on TMEM are not available.
+* **Tensor Core Architecture (`sm_120` vs `sm_100`):** While NVIDIA marketing labels both as 5th-generation Tensor Cores due to native FP4 support, the underlying CUDA instruction pipeline is completely different:
+  * **Datacenter Blackwell (`sm_100`):** Uses the **`tcgen05`** instruction set and 512 KB/SM **Tensor Memory (TMEM)**.
+  * **Consumer Blackwell (`sm_120`):** **DOES NOT SUPPORT `tcgen05`** and **DOES NOT HAVE TMEM**. It executes tensor math using traditional register-based `mma.sync` instructions extended for FP4.
+
+---
+
+### 2. Historical Evolution of Tensor Cores
+
+| Generation | Architecture | Key GPUs | Compute Capability | Low-Level Tensor Pipeline | Key Features |
+|---|---|---|---|---|---|
+| **1st Gen** | Volta (2017) | V100, Titan V | 7.0 | `mma.sync` (HMMA) | First Tensor Cores; FP16 mixed precision. |
+| **2nd Gen** | Turing (2018) | RTX 2080, T4 | 7.5 | `mma.sync` | Added INT8 and INT4 precision. |
+| **3rd Gen** | Ampere (2020) | RTX 3060, A100 | 8.0, 8.6 | `mma.sync` | Added TF32, BF16, and hardware sparsity. |
+| **4th Gen** | Hopper / Ada (2022) | H100 / RTX 4090 | 9.0 (H100), 8.9 (Ada) | `wgmma` on Hopper; `mma.sync` on Ada | FP8 support; Hopper introduced TMA and asynchronous warp-group MMA. |
+| **5th Gen (Datacenter)** | Blackwell (2024) | B200, GB200 | 10.0 (`sm_100`) | **`tcgen05`** + **TMEM** | Asynchronous tensor execution, 512 KB TMEM per SM, native FP4. |
+| **5th Gen (Consumer)** | Blackwell (2025) | RTX 5090, RTX 5080 | 12.0 (`sm_120`) | **`mma.sync` (No `tcgen05`, No TMEM)** | Register-based execution with native FP4 precision, GDDR7. |
+
+---
+
+### 3. What Does "Hardware Thread Block Cluster Support" Mean?
+
+In older architectures (like Ampere RTX 3060 or Ada RTX 4090), each Streaming Multiprocessor (SM) operates in complete physical isolation regarding shared memory:
+- If Block 0 on SM 0 needs data computed by Block 1 on SM 1, that data must travel through global memory (VRAM) or L2 cache.
+- Synchronizing threads across different blocks requires ending the kernel or using atomic memory polling.
+
+Hardware cluster support means three physical mechanisms are built directly into the silicon:
+1. **SM-to-SM Direct On-Chip Interconnect (DSMEM Bus):** SMs inside the same Processing Cluster share a high-speed data bus. A thread in Block 0 can read the shared memory inside Block 1 on a neighboring SM at single-digit nanosecond speeds without touching global memory.
+2. **Hardware Cluster Synchronization Barriers:** The silicon contains dedicated hardware barrier logic (`cluster.sync()`). Multiple SMs can synchronize with each other in a few clock cycles, completely bypassing software-managed locks.
+3. **TMA Multicast Across SMs:** The Tensor Memory Accelerator engine reads a block of data once from global memory and broadcasts (multicasts) that single read across the interconnect into the shared memory of multiple SMs simultaneously.
+
+---
+
+### 4. Consumer Blackwell (RTX 5090) vs Data Center Blackwell (B200)
+
+If both chips share the Blackwell name, TMA, and clusters, what differentiates the data-center B200 from the consumer RTX 5090?
+
+| Specification / Feature | GeForce RTX 5090 (Consumer Blackwell) | NVIDIA B200 (Data Center Blackwell) |
+|---|---|---|
+| **CUDA Compute Capability** | `sm_120` (Compute Capability 12.0) | `sm_100` (Compute Capability 10.0) |
+| **Die Construction** | Single monolithic die (GB202 silicon) | Dual-die chiplet joined by 10 TB/s NV-HBI bus (208B transistors) |
+| **Memory Type** | 32 GB GDDR7 | 192 GB HBM3e |
+| **Memory Bandwidth** | 1,792 GB/s (~1.8 TB/s) | 8,000 GB/s (8.0 TB/s) |
+| **Host / Interconnect Bus** | Standard PCIe Gen 5 (64 GB/s) | NVLink 5 (1,800 GB/s bidirectional per GPU) |
+| **Multi-GPU Scaling** | Standalone desktop / workstation | Scales up to 576 GPUs into a unified cluster (NVL72 racks) |
+| **FP64 (Double Precision) Math** | Standard consumer rate (1/64th FP32 speed) | Dedicated high-performance FP64 Tensor Cores for scientific HPC |
+| **Display Outputs** | DisplayPort 2.1b, HDMI 2.1 | None (Headless datacenter accelerator) |
+| **Graphics Units** | 4th-Gen RT Cores, Raster engines, Display engines | None (Pure compute / AI workload engine) |
+| **TMA & DSMEM Clusters** | Yes (Compute Capability 12.0) | Yes (Compute Capability 10.0) |
+
+---
+
+### 5. What Makes RTX 50 Series Better Than RTX 40 Series for Consumers?
+
+Comparing consumer Blackwell (RTX 50 series) directly with the previous consumer generation (Ada Lovelace / RTX 40 series):
+
+1. **GDDR7 Memory Subsystem:**  
+   The RTX 40 series uses GDDR6X (reaching up to 1,008 GB/s on the RTX 4090). The RTX 50 series is the first consumer graphics card line to use high-speed GDDR7 with PAM3 signaling, raising bandwidth to 1,792 GB/s (~78% higher memory bandwidth).
+2. **Native FP4 Precision in 5th-Gen Tensor Cores:**  
+   The RTX 40 series supports down to FP8. The RTX 50 series adds hardware-native 4-bit floating point (FP4) tensor instructions. This cuts model memory footprint in half and doubles AI inference throughput, powering DLSS 4 (Multi-Frame Generation) and local large language models.
+3. **Arrival of TMA and Clusters in Consumer Silicon:**  
+   In the RTX 40 series (`sm_89`), developers could not use Tensor Memory Accelerator instructions or Distributed Shared Memory clusters. In the RTX 50 series (`sm_120`), developers have full access to TMA and DSMEM for CUDA development on personal workstations.
+4. **4th-Generation RT Cores and Neural Shading:**  
+   Consumer Blackwell includes upgraded Ray Tracing Cores and hardware pipelines for neural shading, allowing game engines to run neural network models inside pixel and vertex shaders for real-time lighting and texture enhancement.
+5. **DisplayPort 2.1b Support:**  
+   Upgraded from DisplayPort 1.4a on RTX 40 series to DisplayPort 2.1b (UHBR20), supporting uncompressed high-refresh gaming displays at 4K 480 Hz and 8K 165 Hz.
+
+---
+
+### 6. The Low-Level Reality: Does Consumer Blackwell (`sm_120`) Have `tcgen05`?
+
+A frequent debate among CUDA developers and deep learning kernel engineers (such as those building CUTLASS, FlashAttention, or custom PyTorch extensions) involves whether the GeForce RTX 50-series supports `tcgen05`:
+
+#### 1. Is `tcgen05` Supported on `sm_120`?
+**NO. `tcgen05` is exclusively available on Datacenter Blackwell (`sm_100` / `sm_100a`, such as B100/B200).**
+
+Attempting to compile PTX code with `tcgen05` instructions (like `tcgen05.mma` or `tcgen05.alloc`) using the compiler flag `-arch=sm_120` triggers an explicit assembler error:
+```text
+ptxas error : Instruction 'tcgen05' not supported on target 'sm_120'
+```
+
+#### 2. Why Does `sm_120` Lack `tcgen05`?
+The `tcgen05` instruction family requires a physical hardware structure called **Tensor Memory (TMEM)**:
+- **Tensor Memory (TMEM):** A dedicated 512 KB per SM on-chip scratchpad SRAM separate from shared memory and standard registers.
+- TMEM is physically manufactured only on datacenter Blackwell silicon (B100/B200).
+- Consumer Blackwell silicon (GB202 / GB203) does not contain TMEM. Without TMEM, `tcgen05.alloc` and `tcgen05.mma` cannot function.
+
+#### 3. How Do RTX 50-Series Tensor Cores Actually Run Math?
+Consumer Blackwell (`sm_120`) drives its Tensor Cores using traditional register-based instructions from the **`mma.sync.aligned`** family:
+- Threads load matrix fragments into standard general-purpose registers.
+- The warp executes matrix multiply-accumulate synchronously using `mma.sync`.
+- Hardware-native **FP4** (`e2m1` precision) is exposed through these `mma.sync` instructions on `sm_120`.
+
+#### 4. Summary: Marketing vs Kernel Engineering
+- **NVIDIA Marketing:** Labels RTX 50-series Tensor Cores as "5th-Generation" because hardware-native FP4 precision, DLSS 4 neural pipelines, and high TOPS are present.
+- **Kernel & Compiler Engineers:** View consumer Blackwell as lacking the true 5th-generation asynchronous tensor pipeline (`tcgen05` + TMEM), operating instead on an evolved register-based `mma.sync` pipeline with FP4 capabilities.
+
+---
+
+### 7. Tensor Instruction Evolution: `wmma` vs `wgmma` vs `tcgen05` and DSMEM vs TMEM
+
+#### 1. The Three Eras of Tensor Instructions
+
+CUDA Tensor Core execution has evolved through three distinct instruction paradigms:
+
+| Instruction Paradigm | Introduced Architecture | Hardware Scope | Execution Model | Data Source / Destination | Supported on RTX 50 (`sm_120`)? |
+|---|---|---|---|---|:---:|
+| **`wmma` / `mma.sync`** | Volta (`sm_70`), Ampere (`sm_80`), Ada (`sm_89`) | Single Warp (32 threads) | Synchronous | Inputs in **Registers** $\rightarrow$ Output in **Registers** | **YES** (Standard engine; FP4 added) |
+| **`wgmma`** | Hopper (`sm_90`) | Warp Group (128 threads / 4 warps) | Asynchronous | Inputs directly from **Shared Memory** $\rightarrow$ Output in **Registers** | **NO** (`ptxas` rejection) |
+| **`tcgen05`** | Datacenter Blackwell (`sm_100`) | CTA / Cluster | Asynchronous | Inputs from **Shared Memory / TMEM** $\rightarrow$ Output in **TMEM** | **NO** (`ptxas` rejection) |
+
+* **Does RTX 50-series support `wgmma`?**  
+  **NO.** `wgmma` (Warp Group Matrix Multiply and Accumulate) is an asynchronous Hopper-specific instruction (`sm_90`). Compiling `wgmma` instructions with `-arch=sm_120` produces:
+  ```text
+  ptxas error : Instruction 'wgmma.mma_async' not supported on target 'sm_120'
+  ```
+  Consumer Blackwell (`sm_120`) relies strictly on the **`mma.sync.aligned`** instruction family.
+
+---
+
+#### 2. TMEM vs DSMEM: Two Completely Different Memory Systems
+
+A common question is whether **TMEM** is another version of **DSMEM**. They are completely distinct physical entities designed for different purposes:
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│             DSMEM vs TMEM: ARCHITECTURAL COMPARISON                    │
+├───────────────────────────────────┬────────────────────────────────────┤
+│   DSMEM (Distributed Shared Memory)│        TMEM (Tensor Memory)        │
+├───────────────────────────────────┼────────────────────────────────────┤
+│ Direction: HORIZONTAL             │ Direction: VERTICAL                │
+│ Bridges communication BETWEEN SMs │ Local storage INSIDE a single SM   │
+│                                   │                                    │
+│ Purpose:                          │ Purpose:                           │
+│ Allows Thread Block 0 on SM 0 to  │ Acts as dedicated storage directly │
+│ read Thread Block 1's shared      │ adjacent to the Tensor Cores to    │
+│ memory across the cluster network.│ hold accumulator tiles ($D = A×B$).│
+│                                   │                                    │
+│ The Problem It Solves:            │ The Problem It Solves:             │
+│ Eliminates trips to global VRAM   │ Eliminates register spilling and   │
+│ when blocks cooperate.            │ extreme register pressure.         │
+│                                   │                                    │
+│ Present on:                       │ Present on:                        │
+│ - Hopper (H100)                   │ - Datacenter Blackwell (B200/B300) │
+│ - Datacenter Blackwell (B200/B300)│                                    │
+│ - Consumer Blackwell (RTX 50)     │ (ABSENT on RTX 50 series)          │
+└───────────────────────────────────┴────────────────────────────────────┘
+```
+
+* **Do B200 and B300 have BOTH DSMEM and TMEM?**  
+  **YES.** Datacenter Blackwell incorporates DSMEM for cluster-wide cooperation across SMs and TMEM for register-free Tensor Core math inside each SM.
+* **Does the RTX 50 series have TMEM?**  
+  **NO.** Consumer Blackwell cards have zero TMEM.
+
+---
+
+#### 3. Complete Feature Checklist: Consumer Blackwell (`sm_120`)
+
+To summarize what consumer GeForce RTX 50 GPUs physically possess:
+
+* **Thread Block Clusters:** **YES** (Compute Capability 12.0 $\ge$ 9.0)
+* **Distributed Shared Memory (DSMEM):** **YES** (Cross-SM shared memory addressing within clusters)
+* **Tensor Memory Accelerator (TMA):** **YES** (Global memory $\leftrightarrow$ Shared memory transfers)
+* **Native FP4 Format Support:** **YES** (`e2m1` precision in hardware)
+* **`wgmma` Instruction Support:** **NO** (Hopper datacenter exclusive)
+* **`tcgen05` Instruction Support:** **NO** (Blackwell datacenter exclusive)
+* **Tensor Memory (TMEM):** **NO** (Blackwell datacenter exclusive)
+* **Primary Tensor Core Instruction:** **`mma.sync.aligned`**
 
 ---
 

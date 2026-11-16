@@ -1,11 +1,11 @@
 # CUDA Proficiency
 
-Refer these documentations and experiments done by me, if you want to become a best GPU programmer or performance engineer(GPU & AI) — **Gautam_1926**
+Detailed notes, hardware explanations, and hands-on experiments for GPU programming and CUDA performance engineering.
 
 ---
 
-> **P.S** — Documentations are done by me after understanding and experimenting on each topic in detail via official references. If any mistakes/errors in the documentations, you are open to raise issues/tickets.
+> **Note:** Documentations and implementations are verified empirically on NVIDIA hardware and aligned with official technical specifications and textbooks (*Programming Massively Parallel Processors*). Issues or contributions are welcome via repository tickets.
 
 ---
 
-Happy learning :-)
+Repository maintained for technical reference and open-source learning.

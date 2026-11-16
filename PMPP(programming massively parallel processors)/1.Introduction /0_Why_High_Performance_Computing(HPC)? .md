@@ -19,7 +19,7 @@ For two decades, software ran faster simply because hardware companies (Intel, A
 
 # In-Depth Simple Visualization
 
-Think of it like a Chef in a Kitchen :
+Consider the analogy of a Kitchen:
 
----> Before 2003 :  You had one chef who got faster and faster every year. Eventually, he was moving so fast he started catching on fire .
----> After 2003: You stopped trying to make the chef move faster. Instead, you hired four chefs.The Problem: If your recipe (your code) is written for only one person to follow, the other three chefs just sit there doing nothing. You have to rewrite the recipe so all four chefs can work at the same time .
+---> Before 2003: A single chef worked faster and faster every year. Eventually, speed increases reached physical limits (excessive heat dissipation).
+---> After 2003: Increasing the speed of a single chef was abandoned. Instead, four chefs were assigned to the kitchen. The Challenge: If a recipe (the software code) is written for only one person to follow sequentially, the remaining three chefs remain completely idle. The recipe must be restructured so all four chefs work in parallel simultaneously.

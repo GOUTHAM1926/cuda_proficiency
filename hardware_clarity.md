@@ -167,7 +167,7 @@ L1 automatically caches global memory reads for ALL threads on that SM regardles
 ### Shared memory vs L1 cache — key differences
 
 | | Shared Memory | L1 Cache |
-|---|---|---|
+| --- | --- | --- |
 | **Who controls it?** | Programmer (explicit code) | Hardware (automatic, behind the scenes) |
 | **Who sees it?** | Threads in the SAME BLOCK only | All threads on that SM (transparent) |
 | **Requires explicit code?** | Yes, declare `__shared__` arrays | No, happens automatically |
@@ -973,7 +973,7 @@ With the 4 occupancy limits established, kernel tuning follows these practical g
 As register usage goes up, occupancy drops. Here is exactly how it affects latency hiding on an RTX 3060:
 
 | Registers per Thread | Max Threads fitting on SM | Active Warps | Occupancy | Performance Impact |
-|:---:|:---:|:---:|:---:|---|
+| :---: | :---: | :---: | :---: | --- |
 | **16** | 1,536 (hits SM cap) | 48 | **100%** | **Sweet spot** (Perfect latency hiding) |
 | **32** | 1,536 (hits SM cap) | 48 | **100%** | **Sweet spot** (Still perfect) |
 | **64** | 1,024 | 32 | **67%** | Acceptable for most kernels |
@@ -1009,7 +1009,7 @@ Why? Designing a kernel that results in only **1 block per SM** (e.g., due to ex
 ## Full RTX 3060 Specifications Table
 
 | Property | Value | Meaning |
-|---|---|---|
+| --- | --- | --- |
 | **VRAM (Global Memory)** | 12 GiB (12,288 MiB) | Main GPU memory, slow but large. CUDA reports ~11,900 MiB available (rest reserved by driver/display) |
 | **L2 Cache** | 2.25 MB (2,304 KB = 2,359,296 bytes) | Shared cache across all SMs |
 | **SRAM per SM** | 128 KB | Split between L1 cache and shared memory |
@@ -1092,12 +1092,12 @@ Here is a detailed history of what changed (and what stayed the same) across NVI
 ### The Variables (Things that DO change)
 
 | GPU Architecture | Compute Capability | Max Threads per SM | Max Blocks per SM | Total Registers per SM | Shared Memory per SM | Examples |
-|---|:---:|:---:|:---:|:---:|:---:|---|
+| --- | :---: | :---: | :---: | :---: | :---: | --- |
 | **Kepler** | 3.x | 2048 | 16 | 65,536 (256 KB) | 48 KB | GTX 780, K80 |
 | **Maxwell** | 5.x | 2048 | 32 | 65,536 (256 KB) | 96 KB | GTX 980 |
 | **Pascal** | 6.x | 2048 | 32 | 65,536 (256 KB) | 96 KB | GTX 1080, P100 |
 | **Volta / Turing** | 7.x | **1024** | 16 | 65,536 (256 KB) | 96 KB | RTX 2080, V100 |
-| **Ampere (Data Center)**| 8.0 | 2048 | 32 | 65,536 (256 KB) | **164 KB** | A100 |
+| **Ampere (Data Center)** | 8.0 | 2048 | 32 | 65,536 (256 KB) | **164 KB** | A100 |
 | **Ampere (Consumer)** | 8.6 | 1536 | 16 | 65,536 (256 KB) | 100 KB | **RTX 3060**, RTX 3090 |
 | **Ada Lovelace** | 8.9 | 1536 | **24** | 65,536 (256 KB) | 100 KB | RTX 4090 |
 | **Hopper** | 9.0 | 2048 | 32 | 65,536 (256 KB) | **227 KB** | H100 |
@@ -1153,19 +1153,25 @@ The GPU hardware scheduler actively balances and distributes the requested threa
 The physical RTX 3060 chip contains **28 SMs**. How blocks distribute depends directly on the launch configuration:
 
 #### Scenario A: Undersubscribed Launch (15 Blocks)
+
 Suppose a kernel launches with 15 blocks (e.g., `vecAddKernel<<<15, 256>>>`):
+
 - The hardware block scheduler assigns **1 block to each of 15 SMs**.
 - The remaining **13 SMs sit completely idle** with zero work.
 - The GPU does **not** dump all 15 blocks onto a single SM. The scheduler always prioritizes distributing blocks across distinct SMs to maximize memory bandwidth and execution unit availability.
 - *Implication:* Launching fewer blocks than the number of physical SMs leaves hardware underutilized.
 
 #### Scenario B: Balanced Launch (56 Blocks)
+
 Suppose a kernel launches with 56 blocks:
+
 - The scheduler assigns 2 blocks to each of the 28 SMs ($56 / 28 = 2$).
 - If register and shared memory footprints permit, both blocks run concurrently on each SM. If resources are constrained, the SM executes the blocks in sequential waves.
 
 #### Scenario C: Large-Scale Launch (1,400 Blocks)
+
 Suppose a kernel launches with 1,400 blocks:
+
 - The scheduler assigns approximately 50 blocks to each SM over time ($1,400 / 28 = 50$).
 - Each SM runs resident blocks concurrently. As resident blocks finish, the SM continuously pulls waiting blocks from the grid queue until all 1,400 blocks complete.
 
@@ -1174,12 +1180,15 @@ Suppose a kernel launches with 1,400 blocks:
 ### Common Architectural Questions on Block Execution
 
 #### Can the programmer manually pin blocks to specific SMs?
-**No.** In standard CUDA, the programmer cannot specify that Block 0 must run on SM 0 or force all blocks onto a single SM. 
+
+**No.** In standard CUDA, the programmer cannot specify that Block 0 must run on SM 0 or force all blocks onto a single SM.
 
 The hardware scheduler retains exclusive authority over block placement. This design ensures **transparent scalability**: the identical compiled binary can execute on an entry-level GPU with 2 SMs or a high-end data center accelerator with 144 SMs without modifying source code or recompiling.
 
 #### In the classic CUDA model, can two blocks on the same SM share resources?
+
 **No.** In the classic CUDA programming model (all architectures prior to Hopper):
+
 - **Shared memory is strictly block-private:** Even if Block 0 and Block 1 are resident on the exact same SM at the same time, Block 0 cannot access Block 1's shared memory. Each block receives a distinct, isolated hardware slice of SRAM.
 - **Synchronization is strictly block-private:** `__syncthreads()` synchronizes only the threads belonging to that specific block. It cannot synchronize threads across different blocks.
 - **Inter-block communication requirement:** If threads must communicate, exchange data, or synchronize, those threads **must belong to the same block** (limited to 1,024 threads).
@@ -1241,7 +1250,7 @@ Cluster Execution Hierarchy (Hopper & Blackwell):
 └────────────────────────────────────────────────────────────────────────────┘
 ```
 
-#### Key Capabilities of Thread Block Clusters:
+#### Key Capabilities of Thread Block Clusters
 
 1. **Guaranteed Co-Scheduling:**
    A cluster groups up to 8 or 16 thread blocks. The hardware scheduler guarantees that all blocks within a cluster are scheduled simultaneously on physically adjacent SMs within the same Processing Cluster (GPC / TPC).
@@ -1263,7 +1272,7 @@ Cluster Execution Hierarchy (Hopper & Blackwell):
 ### Architectural Generation Matrix: Block Independence vs Clustering
 
 | Architecture | Generation | Compute Capability | Execution Hierarchy | Inter-Block SM Communication | Hardware Synchronization Scope | Target Domain |
-|---|---|:---:|---|---|---|---|
+| --- | --- | :---: | --- | --- | --- | --- |
 | **Fermi** | 2010 | 2.0 | `Grid -> Block -> Thread` | None (VRAM only) | Block only (`__syncthreads`) | General GPU Computing |
 | **Kepler** | 2012 | 3.x | `Grid -> Block -> Thread` | None (VRAM only) | Block only (`__syncthreads`) | High Performance Computing |
 | **Maxwell** | 2014 | 5.x | `Grid -> Block -> Thread` | None (VRAM only) | Block only (`__syncthreads`) | Energy Efficient Graphics/Compute |
@@ -1271,7 +1280,7 @@ Cluster Execution Hierarchy (Hopper & Blackwell):
 | **Volta** | 2017 | 7.0 | `Grid -> Block -> Thread` | None (VRAM only) | Block + Warp (`__syncwarp`) | Tensor Cores Introduced |
 | **Turing** | 2018 | 7.5 | `Grid -> Block -> Thread` | None (VRAM only) | Block + Warp | Ray Tracing / Consumer DL |
 | **Ampere** | 2020 | 8.0 (A100)<br>8.6 (**RTX 3060**) | `Grid -> Block -> Thread` | None (VRAM only) | Block + Warp | Asynchronous Copy (`cp.async`) |
-| **Ada Lovelace**| 2022 | 8.9 (RTX 4090) | `Grid -> Block -> Thread` | None (VRAM only) | Block + Warp | Massive L2 Cache Jump |
+| **Ada Lovelace** | 2022 | 8.9 (RTX 4090) | `Grid -> Block -> Thread` | None (VRAM only) | Block + Warp | Massive L2 Cache Jump |
 | **Hopper** | 2022 | 9.0 (H100) | `Grid -> Cluster -> Block -> Thread` | **DSMEM** (SM-to-SM Interconnect) | Cluster (`cluster.sync`) + Block + Warp | Transformer Engine, 4th Gen Tensor Cores |
 | **Blackwell** | 2024 | 10.0 (B200, GB200) | `Grid -> Cluster -> Block -> Thread` | **Enhanced DSMEM** + TMA Multicast | Cluster (`cluster.sync`) + Block + Warp | FP4 Tensor Cores, Multi-Die Superchips |
 
@@ -1291,13 +1300,16 @@ On consumer Ampere hardware (such as the RTX 3060), thread blocks operate under 
 A common point of confusion is whether shared memory isolation depends on physical location (same SM vs different SMs) or architectural grouping (classic blocks vs clusters).
 
 #### 1. The Classic Rule (Ampere / RTX 3060 and Earlier)
+
 In all architectures prior to Compute Capability 9.0 (including the RTX 3060):
+
 - **Across different SMs:** Shared memory is completely isolated.
 - **Inside the same SM:** Shared memory is completely isolated.
 
 Physical location does not alter isolation. Even when the hardware scheduler places Block 0 and Block 1 onto the identical physical SM at the same moment, the hardware enforces strict memory segregation. Block 0 cannot address, load, or store into the SRAM allocated to Block 1.
 
 #### 2. The Modern Rule (Hopper & Blackwell: Compute Capability >= 9.0)
+
 In architectures supporting Thread Block Clusters, isolation is governed exclusively by **Cluster Membership**, not by physical SM placement:
 
 - **Case 1: Blocks in the SAME Cluster on DIFFERENT SMs (Inter-SM Access)**  
@@ -1308,7 +1320,7 @@ In architectures supporting Thread Block Clusters, isolation is governed exclusi
   If the hardware scheduler places Block 0 and Block 1 of the same cluster onto the identical physical SM (SM 0), cross-block shared memory access remains fully supported. In this case, the transaction routes locally through the SM's internal SRAM crossbar without traversing the inter-SM bus.
 
 - **Case 3: Blocks in DIFFERENT Clusters (Regardless of SM Placement)**  
-  If Block A and Block B belong to different clusters, neither can access the other's shared memory, regardless of whether they execute on different SMs or the same SM.
+  If Block A and Block B belong to different clusters, neither can access the other's shared memory, regardless of whether execution occurs on different SMs or the same SM.
 
 ```
 Access Authorization Decision Flow:
@@ -1326,7 +1338,7 @@ Access Authorization Decision Flow:
 #### Shared Memory Cross-Access Matrix
 
 | Hardware Architecture | Cluster Membership | Execution Location | Cross-Block Shared Memory Access? | Routing Path |
-|---|---|---|:---:|---|
+| --- | --- | --- | :---: | --- |
 | **Classic (Ampere / RTX 3060)** | N/A (No clusters) | Different SMs | **No** | Block-isolated |
 | **Classic (Ampere / RTX 3060)** | N/A (No clusters) | Same SM | **No** | Block-isolated |
 | **Hopper / Blackwell (CC >= 9.0)** | Different Clusters | Different SMs | **No** | Cluster-isolated |
@@ -1338,23 +1350,23 @@ Access Authorization Decision Flow:
 
 ## Blackwell Architecture: Data Center (B200 / GB200) vs Consumer (GeForce RTX 50 Series)
 
-A major point of inquiry is whether modern architectural additions like **Thread Block Clusters**, **Distributed Shared Memory (DSMEM)**, and the **Tensor Memory Accelerator (TMA)** exist only on data-center systems or whether they also run on consumer-grade GeForce RTX 50-series GPUs.
+A major point of inquiry is whether modern architectural additions like **Thread Block Clusters**, **Distributed Shared Memory (DSMEM)**, and the **Tensor Memory Accelerator (TMA)** exist only on data-center systems or whether these features also run on consumer-grade GeForce RTX 50-series GPUs.
 
 ### 1. Consumer Blackwell (`sm_120`) Supports Clusters and TMA
 
-* **Compute Capability 12.0 (`sm_120`):** The GeForce RTX 50 series (RTX 5090, RTX 5080, RTX 5070) belongs to Compute Capability 12.0.
-* **Thread Block Clusters:** Supported in hardware. As documented in the official NVIDIA CUDA C++ Programming Guide, Thread Block Clusters require Compute Capability 9.0 or higher. Because 12.0 is greater than 9.0, consumer Blackwell includes hardware support for clusters and Distributed Shared Memory.
-* **Tensor Memory Accelerator (TMA):** Basic asynchronous tensor copies are supported, but advanced datacenter TMA pipelines that rely on TMEM are not available.
-* **Tensor Core Architecture (`sm_120` vs `sm_100`):** While NVIDIA marketing labels both as 5th-generation Tensor Cores due to native FP4 support, the underlying CUDA instruction pipeline is completely different:
-  * **Datacenter Blackwell (`sm_100`):** Uses the **`tcgen05`** instruction set and 512 KB/SM **Tensor Memory (TMEM)**.
-  * **Consumer Blackwell (`sm_120`):** **DOES NOT SUPPORT `tcgen05`** and **DOES NOT HAVE TMEM**. It executes tensor math using traditional register-based `mma.sync` instructions extended for FP4.
+- **Compute Capability 12.0 (`sm_120`):** The GeForce RTX 50 series (RTX 5090, RTX 5080, RTX 5070) belongs to Compute Capability 12.0.
+- **Thread Block Clusters:** Supported in hardware. As documented in the official NVIDIA CUDA C++ Programming Guide, Thread Block Clusters require Compute Capability 9.0 or higher. Because 12.0 is greater than 9.0, consumer Blackwell includes hardware support for clusters and Distributed Shared Memory.
+- **Tensor Memory Accelerator (TMA):** Basic asynchronous tensor copies are supported, but advanced datacenter TMA pipelines that rely on TMEM are not available.
+- **Tensor Core Architecture (`sm_120` vs `sm_100`):** While NVIDIA marketing labels both as 5th-generation Tensor Cores due to native FP4 support, the underlying CUDA instruction pipeline is completely different:
+  - **Datacenter Blackwell (`sm_100`):** Uses the **`tcgen05`** instruction set and 512 KB/SM **Tensor Memory (TMEM)**.
+  - **Consumer Blackwell (`sm_120`):** **DOES NOT SUPPORT `tcgen05`** and **DOES NOT HAVE TMEM**. It executes tensor math using traditional register-based `mma.sync` instructions extended for FP4.
 
 ---
 
 ### 2. Historical Evolution of Tensor Cores
 
 | Generation | Architecture | Key GPUs | Compute Capability | Low-Level Tensor Pipeline | Key Features |
-|---|---|---|---|---|---|
+| --- | --- | --- | --- | --- | --- |
 | **1st Gen** | Volta (2017) | V100, Titan V | 7.0 | `mma.sync` (HMMA) | First Tensor Cores; FP16 mixed precision. |
 | **2nd Gen** | Turing (2018) | RTX 2080, T4 | 7.5 | `mma.sync` | Added INT8 and INT4 precision. |
 | **3rd Gen** | Ampere (2020) | RTX 3060, A100 | 8.0, 8.6 | `mma.sync` | Added TF32, BF16, and hardware sparsity. |
@@ -1367,10 +1379,12 @@ A major point of inquiry is whether modern architectural additions like **Thread
 ### 3. What Does "Hardware Thread Block Cluster Support" Mean?
 
 In older architectures (like Ampere RTX 3060 or Ada RTX 4090), each Streaming Multiprocessor (SM) operates in complete physical isolation regarding shared memory:
+
 - If Block 0 on SM 0 needs data computed by Block 1 on SM 1, that data must travel through global memory (VRAM) or L2 cache.
 - Synchronizing threads across different blocks requires ending the kernel or using atomic memory polling.
 
 Hardware cluster support means three physical mechanisms are built directly into the silicon:
+
 1. **SM-to-SM Direct On-Chip Interconnect (DSMEM Bus):** SMs inside the same Processing Cluster share a high-speed data bus. A thread in Block 0 can read the shared memory inside Block 1 on a neighboring SM at single-digit nanosecond speeds without touching global memory.
 2. **Hardware Cluster Synchronization Barriers:** The silicon contains dedicated hardware barrier logic (`cluster.sync()`). Multiple SMs can synchronize with each other in a few clock cycles, completely bypassing software-managed locks.
 3. **TMA Multicast Across SMs:** The Tensor Memory Accelerator engine reads a block of data once from global memory and broadcasts (multicasts) that single read across the interconnect into the shared memory of multiple SMs simultaneously.
@@ -1382,7 +1396,7 @@ Hardware cluster support means three physical mechanisms are built directly into
 If both chips share the Blackwell name, TMA, and clusters, what differentiates the data-center B200 from the consumer RTX 5090?
 
 | Specification / Feature | GeForce RTX 5090 (Consumer Blackwell) | NVIDIA B200 (Data Center Blackwell) |
-|---|---|---|
+| --- | --- | --- |
 | **CUDA Compute Capability** | `sm_120` (Compute Capability 12.0) | `sm_100` (Compute Capability 10.0) |
 | **Die Construction** | Single monolithic die (GB202 silicon) | Dual-die chiplet joined by 10 TB/s NV-HBI bus (208B transistors) |
 | **Memory Type** | 32 GB GDDR7 | 192 GB HBM3e |
@@ -1418,26 +1432,33 @@ Comparing consumer Blackwell (RTX 50 series) directly with the previous consumer
 A frequent debate among CUDA developers and deep learning kernel engineers (such as those building CUTLASS, FlashAttention, or custom PyTorch extensions) involves whether the GeForce RTX 50-series supports `tcgen05`:
 
 #### 1. Is `tcgen05` Supported on `sm_120`?
+
 **NO. `tcgen05` is exclusively available on Datacenter Blackwell (`sm_100` / `sm_100a`, such as B100/B200).**
 
 Attempting to compile PTX code with `tcgen05` instructions (like `tcgen05.mma` or `tcgen05.alloc`) using the compiler flag `-arch=sm_120` triggers an explicit assembler error:
+
 ```text
 ptxas error : Instruction 'tcgen05' not supported on target 'sm_120'
 ```
 
 #### 2. Why Does `sm_120` Lack `tcgen05`?
+
 The `tcgen05` instruction family requires a physical hardware structure called **Tensor Memory (TMEM)**:
+
 - **Tensor Memory (TMEM):** A dedicated 512 KB per SM on-chip scratchpad SRAM separate from shared memory and standard registers.
 - TMEM is physically manufactured only on datacenter Blackwell silicon (B100/B200).
 - Consumer Blackwell silicon (GB202 / GB203) does not contain TMEM. Without TMEM, `tcgen05.alloc` and `tcgen05.mma` cannot function.
 
 #### 3. How Do RTX 50-Series Tensor Cores Actually Run Math?
+
 Consumer Blackwell (`sm_120`) drives its Tensor Cores using traditional register-based instructions from the **`mma.sync.aligned`** family:
+
 - Threads load matrix fragments into standard general-purpose registers.
 - The warp executes matrix multiply-accumulate synchronously using `mma.sync`.
 - Hardware-native **FP4** (`e2m1` precision) is exposed through these `mma.sync` instructions on `sm_120`.
 
 #### 4. Summary: Marketing vs Kernel Engineering
+
 - **NVIDIA Marketing:** Labels RTX 50-series Tensor Cores as "5th-Generation" because hardware-native FP4 precision, DLSS 4 neural pipelines, and high TOPS are present.
 - **Kernel & Compiler Engineers:** View consumer Blackwell as lacking the true 5th-generation asynchronous tensor pipeline (`tcgen05` + TMEM), operating instead on an evolved register-based `mma.sync` pipeline with FP4 capabilities.
 
@@ -1450,23 +1471,25 @@ Consumer Blackwell (`sm_120`) drives its Tensor Cores using traditional register
 CUDA Tensor Core execution has evolved through three distinct instruction paradigms:
 
 | Instruction Paradigm | Introduced Architecture | Hardware Scope | Execution Model | Data Source / Destination | Supported on RTX 50 (`sm_120`)? |
-|---|---|---|---|---|:---:|
+| --- | --- | --- | --- | --- | :---: |
 | **`wmma` / `mma.sync`** | Volta (`sm_70`), Ampere (`sm_80`), Ada (`sm_89`) | Single Warp (32 threads) | Synchronous | Inputs in **Registers** $\rightarrow$ Output in **Registers** | **YES** (Standard engine; FP4 added) |
 | **`wgmma`** | Hopper (`sm_90`) | Warp Group (128 threads / 4 warps) | Asynchronous | Inputs directly from **Shared Memory** $\rightarrow$ Output in **Registers** | **NO** (`ptxas` rejection) |
 | **`tcgen05`** | Datacenter Blackwell (`sm_100`) | CTA / Cluster | Asynchronous | Inputs from **Shared Memory / TMEM** $\rightarrow$ Output in **TMEM** | **NO** (`ptxas` rejection) |
 
-* **Does RTX 50-series support `wgmma`?**  
+- **Does RTX 50-series support `wgmma`?**  
   **NO.** `wgmma` (Warp Group Matrix Multiply and Accumulate) is an asynchronous Hopper-specific instruction (`sm_90`). Compiling `wgmma` instructions with `-arch=sm_120` produces:
+
   ```text
   ptxas error : Instruction 'wgmma.mma_async' not supported on target 'sm_120'
   ```
+
   Consumer Blackwell (`sm_120`) relies strictly on the **`mma.sync.aligned`** instruction family.
 
 ---
 
 #### 2. TMEM vs DSMEM: Two Completely Different Memory Systems
 
-A common question is whether **TMEM** is another version of **DSMEM**. They are completely distinct physical entities designed for different purposes:
+A common question is whether **TMEM** is another version of **DSMEM**. Both structures are completely distinct physical entities designed for different purposes:
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -1493,9 +1516,9 @@ A common question is whether **TMEM** is another version of **DSMEM**. They are 
 └───────────────────────────────────┴────────────────────────────────────┘
 ```
 
-* **Do B200 and B300 have BOTH DSMEM and TMEM?**  
+- **Do B200 and B300 have BOTH DSMEM and TMEM?**  
   **YES.** Datacenter Blackwell incorporates DSMEM for cluster-wide cooperation across SMs and TMEM for register-free Tensor Core math inside each SM.
-* **Does the RTX 50 series have TMEM?**  
+- **Does the RTX 50 series have TMEM?**  
   **NO.** Consumer Blackwell cards have zero TMEM.
 
 ---
@@ -1504,14 +1527,178 @@ A common question is whether **TMEM** is another version of **DSMEM**. They are 
 
 To summarize what consumer GeForce RTX 50 GPUs physically possess:
 
-* **Thread Block Clusters:** **YES** (Compute Capability 12.0 $\ge$ 9.0)
-* **Distributed Shared Memory (DSMEM):** **YES** (Cross-SM shared memory addressing within clusters)
-* **Tensor Memory Accelerator (TMA):** **YES** (Global memory $\leftrightarrow$ Shared memory transfers)
-* **Native FP4 Format Support:** **YES** (`e2m1` precision in hardware)
-* **`wgmma` Instruction Support:** **NO** (Hopper datacenter exclusive)
-* **`tcgen05` Instruction Support:** **NO** (Blackwell datacenter exclusive)
-* **Tensor Memory (TMEM):** **NO** (Blackwell datacenter exclusive)
-* **Primary Tensor Core Instruction:** **`mma.sync.aligned`**
+- **Thread Block Clusters:** **YES** (Compute Capability 12.0 $\ge$ 9.0)
+- **Distributed Shared Memory (DSMEM):** **YES** (Cross-SM shared memory addressing within clusters)
+- **Tensor Memory Accelerator (TMA):** **YES** (Global memory $\leftrightarrow$ Shared memory transfers)
+- **Native FP4 Format Support:** **YES** (`e2m1` precision in hardware)
+- **`wgmma` Instruction Support:** **NO** (Hopper datacenter exclusive)
+- **`tcgen05` Instruction Support:** **NO** (Blackwell datacenter exclusive)
+- **Tensor Memory (TMEM):** **NO** (Blackwell datacenter exclusive)
+- **Primary Tensor Core Instruction:** **`mma.sync.aligned`**
+
+---
+
+#### 4. Disambiguation: Thread Block Clusters vs Warp Groups
+
+A frequent point of terminology confusion is mixing up **Thread Block Clusters** with **Warp Groups**:
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│             THREAD BLOCK CLUSTERS vs WARP GROUPS                       │
+├───────────────────────────────────┬────────────────────────────────────┤
+│   Thread Block Clusters (Macro)   │         Warp Groups (Micro)        │
+├───────────────────────────────────┼────────────────────────────────────┤
+│ Scope: ACROSS BLOCKS (Inter-Block)│ Scope: INSIDE ONE BLOCK (Intra-SM) │
+│                                   │                                    │
+│ Definition:                       │ Definition:                        │
+│ A collection of multiple Thread   │ A bundle of exactly 4 contiguous   │
+│ Blocks (CTAs) co-scheduled on     │ warps (128 threads) within a single│
+│ the same GPC.                     │ block acting together.             │
+│                                   │                                    │
+│ Hardware Capability:              │ Hardware Capability:               │
+│ Uses **DSMEM** to share shared    │ Uses **`wgmma`** to execute        │
+│ memory across different SMs.      │ asynchronous matrix math directly  │
+│                                   │ from shared memory.                │
+│                                   │                                    │
+│ Supported on Consumer RTX 50?     │ Supported on Consumer RTX 50?      │
+│ **YES.** Supported on all GPUs    │ **NO.** The hardware execution     │
+│ with Compute Capability >= 9.0.   │ unit for `wgmma` is absent.        │
+└───────────────────────────────────┴────────────────────────────────────┘
+```
+
+- **Thread Block Clusters** belong to the grid execution hierarchy (`Grid -> Cluster -> Block -> Thread`). Consumer Blackwell (`sm_120`) has full hardware support for clusters and Distributed Shared Memory.
+- **Warp Groups** refer to the execution units for `wgmma` inside an SM. Consumer Blackwell (`sm_120`) does **not** support `wgmma`; its Tensor Cores are driven at the standard single-warp level (32 threads) using `mma.sync.aligned`.
+
+---
+
+#### 5. Deep Dive: Hopper `wgmma` vs Datacenter Blackwell `tcgen05`
+
+A frequent point of inquiry is how Hopper's Warp Group execution (`wgmma`) compares with Blackwell's Tensor Memory execution (`tcgen05`), and how intra-SM versus inter-SM shared memory routing operates.
+
+##### 1. How Intra-SM vs Inter-SM Shared Memory Sharing Operates Under DSMEM
+
+* **In Classic Architectures (Ampere / RTX 3060 and Earlier):**  
+  Shared memory is strictly private to each individual block. Two blocks executing on the same physical SM cannot access each other's shared memory under any circumstances.
+- **In Cluster Architectures (Hopper CC 9.0 and Blackwell CC 10.0 / 12.0):**  
+  **DSMEM (Distributed Shared Memory)** is a unified logical address space created across all thread blocks belonging to the **same cluster**:
+  - **Inter-SM (Blocks on Different SMs):** When Block 0 on SM 0 accesses Block 1's shared memory on SM 1, the transaction routes over the physical on-chip **SM-to-SM network bus**.
+  - **Intra-SM (Blocks on the Same SM):** If the scheduler places Block 0 and Block 1 of the same cluster onto the identical physical SM, cross-block access remains fully functional. In this case, the transaction routes locally through the SM's **internal SRAM crossbar switch**, avoiding the external inter-SM bus while using the exact same logical DSMEM addressing.
+  - **Blocks in Different Clusters:** If two blocks belong to different clusters, complete isolation remains, regardless of whether execution occurs on different SMs or the same SM.
+
+##### 2. The Fundamental Difference: Data Sharing (DSMEM) vs Compute Execution (`wgmma` / `tcgen05`)
+
+* **DSMEM:** A **memory and communication mechanism** that allows blocks across a cluster to share data directly without writing to global VRAM.
+- **`wgmma` and `tcgen05`:** **Compute instructions** that tell the physical Tensor Cores to multiply matrices ($D = A \times B + C$).
+
+##### 3. Why `tcgen05` in Blackwell is Vastly More Advanced Than `wgmma` in Hopper
+
+`tcgen05` represents a major generational redesign over Hopper's `wgmma`:
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                   HOPPER wgmma vs BLACKWELL tcgen05                    │
+├───────────────────────────────────┬────────────────────────────────────┤
+│         Hopper wgmma (sm_90)      │     Blackwell tcgen05 (sm_100)     │
+├───────────────────────────────────┼────────────────────────────────────┤
+│ Issue Mechanism:                  │ Issue Mechanism:                   │
+│ Collective issue by ALL 128       │ Single-thread issue semantics.     │
+│ threads (4 warps) in the group.   │ ONE thread issues the instruction. │
+│                                   │                                    │
+│ Thread Availability:              │ Thread Availability:               │
+│ All 128 threads are locked into   │ Remaining threads are 100% free to │
+│ instruction coordination.         │ compute activations, scales, etc.  │
+│                                   │                                    │
+│ Accumulator Destination:          │ Accumulator Destination:           │
+│ General-Purpose Registers (RF).   │ Dedicated **Tensor Memory (TMEM)**.│
+│                                   │                                    │
+│ Register Pressure Impact:         │ Register Pressure Impact:          │
+│ Massive register consumption      │ ZERO general registers consumed for│
+│ (causes register spilling and     │ accumulators (boosts occupancy and │
+│ severely lowers SM occupancy).    │ allows massive tile sizes).        │
+│                                   │                                    │
+│ Execution Boundary:               │ Execution Boundary:                │
+│ Strictly inside ONE single block  │ Multi-SM cooperative execution:    │
+│ on a single SM.                   │ **MMA.2SM** coordinates 2 blocks   │
+│                                   │ across 2 SMs in a single op.       │
+│                                   │                                    │
+│ Instruction Latency:              │ Instruction Latency:               │
+│ Scales with tile width            │ Extremely low and nearly constant  │
+│ (~32 to 128 clock cycles).        │ (~11 clock cycles).                │
+└───────────────────────────────────┴────────────────────────────────────┘
+```
+
+##### 4. Summary: Physical Boundary of `tcgen05`
+
+* **Is `tcgen05` inside the same block or outside?**  
+  `tcgen05` supports both:
+  1. **Single-CTA Mode:** A single thread block inside an SM executes `tcgen05.mma`, writing matrix outputs directly into that SM's local TMEM.
+  2. **Multi-CTA Mode (`MMA.2SM`):** Two cooperating thread blocks across two neighboring SMs in a cluster join forces to execute a single `tcgen05.mma` instruction (`cta_group::2`), pooling physical Tensor Cores to compute matrix tiles as large as $256 \times 256 \times 16$ in a single instruction.
+
+---
+
+#### 6. Deep Dive: Warp Schedulers, Warp Groups, and Multi-Block Coordination
+
+A detailed analysis of how warps are scheduled, how many warp groups can exist per SM, and how Blackwell coordinates blocks versus Hopper's warps:
+
+##### 1. How Many Warps Run at a Time Per SM? (Physical Schedulers)
+
+* **The 4-Partition Layout:** In all modern NVIDIA architectures (Ampere, Hopper, Blackwell), an SM is physically divided into **4 processing partitions** (quadrants).
+- **Schedulers per SM:** Each partition contains its own dedicated hardware **Warp Scheduler**. Therefore, an SM has **4 Warp Schedulers**.
+- **Issue Rate:** Every single clock cycle, each SM can issue instructions from up to **4 warps simultaneously** (one warp per scheduler partition).
+
+```
+                 Streaming Multiprocessor (SM) Layout
+┌──────────────────┬──────────────────┬──────────────────┬──────────────────┐
+│   Partition 0    │   Partition 1    │   Partition 2    │   Partition 3    │
+│ [Warp Scheduler] │ [Warp Scheduler] │ [Warp Scheduler] │ [Warp Scheduler] │
+│ [Register File]  │ [Register File]  │ [Register File]  │ [Register File]  │
+│ [CUDA/Tensor Core│ [CUDA/Tensor Core│ [CUDA/Tensor Core│ [CUDA/Tensor Core│
+└──────────────────┴──────────────────┴──────────────────┴──────────────────┘
+```
+
+##### 2. How Earlier Architectures Handled Matrix Math (Single-Warp `mma.sync`)
+
+* In Volta, Turing, Ampere, and Ada Lovelace, Tensor Core matrix instructions were executed strictly by a **single warp (32 threads)** at a time.
+- Each warp loaded matrix fragments into its own private registers and executed `mma.sync`. The 4 warp schedulers operated independently.
+
+##### 3. How Hopper Introduced Warp Groups (`wgmma`)
+
+* In Hopper (`sm_90`), NVIDIA combined the execution capability of **4 contiguous warps (128 threads)** inside a single thread block to create a **Warp Group**.
+- When issuing `wgmma.mma_async`, all 4 warps coordinate to execute a single large matrix multiply directly from shared memory.
+- **How many Warp Groups can exist per SM in Hopper?**
+  - A Hopper SM supports up to **64 resident warps** (2048 threads).
+  - Since 1 Warp Group consists of 4 warps:
+    $$\text{Max Warp Groups Per SM} = \frac{64 \text{ resident warps}}{4 \text{ warps per group}} = \mathbf{16 \text{ Warp Groups in flight}}$$
+  - An SM can manage up to 16 warp groups concurrently, switching between active groups to hide execution latency.
+
+##### 4. How Blackwell Datacenter (`sm_100`) Replaced Warp Groups with `tcgen05`
+
+In Datacenter Blackwell, NVIDIA moved beyond the Hopper warp group model:
+
+1. **Decoupled Instruction Issue:** In Hopper, all 128 threads in the warp group were locked into coordinating `wgmma`. In Blackwell, **a single thread** issues `tcgen05.mma` via a hardware descriptor. The remaining threads are 100% free to do other computation.
+2. **TMEM Direct Accumulation:** Instead of dumping accumulators into thread registers (which crushed occupancy in Hopper), `tcgen05` writes directly into the 512 KB **Tensor Memory (TMEM)**, consuming zero general-purpose registers.
+
+##### 5. What is a CTA?
+
+* **CTA** stands for **Cooperative Thread Array**.
+- In CUDA architecture, CTA is simply NVIDIA's official hardware engineering term for a **Thread Block**.
+- $1 \text{ CTA} \equiv 1 \text{ Thread Block}$.
+
+##### 6. Multi-Block Tensor Coordination: `MMA.2SM` in Blackwell
+
+* In Hopper, tensor operations were strictly confined within **1 single block on 1 single SM**.
+- In Datacenter Blackwell (`sm_100`), NVIDIA introduced **`MMA.2SM`** (`cta_group::2` in PTX):
+  - Two neighboring thread blocks (CTAs) located on **two distinct physical SMs** within a cluster collaborate to execute a single joint matrix multiplication.
+  - The two SMs pool physical Tensor Cores together over the high-speed DSMEM interconnect to compute massive matrix tiles (e.g., $256 \times 256 \times 16$) in a single operation.
+- **Does `MMA.2SM` mean only 2 blocks can run on the GPU at a time?**
+  - **No.** `MMA.2SM` describes the *instruction cooperation granularity* (pairing 2 SMs together for a single giant math operation).
+  - A Blackwell B200 GPU contains 160 SMs. The GPU runs dozens of SM pairs concurrently, executing hundreds of blocks across the entire chip in parallel.
+
+##### 7. Does the Consumer RTX 50 Series Have Warp Groups or `MMA.2SM`?
+
+* **No.** Consumer Blackwell (`sm_120`) lacks `MMA.2SM`, lacks `wgmma`, and lacks `tcgen05`.
+- Tensor Core instructions on the RTX 50 series are driven at the standard single-warp level (32 threads) using `mma.sync.aligned`.
+- However, the RTX 50 series retains **Thread Block Clusters** and **DSMEM** for general-purpose inter-block and intra-block data sharing.
 
 ---
 
